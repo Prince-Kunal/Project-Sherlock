@@ -614,7 +614,7 @@ SENTRY_DSN=              # optional
 
 | Phase | Status | Date | Notes / deviations from plan |
 |---|---|---|---|
-| 0 | not started | | |
+| 0 | done | 2026-10-04 | All 17 §5 tables (incl. Phase 8 ones) in the initial migration; enums are VARCHAR + named CHECK. Additions: `jobs.missed_polls` (for "inactive after 3 missed polls"), `upgraded_to_job` event type, `outreach.contact_id` nullable (`no_contact` failures), `outreach.job_id` FK is RESTRICT (jobs are deactivated, never deleted), CHECK `followup_count <= 1`. Host ports: Postgres 5433, Redis 6380 (5432/6379 taken locally). Frontend is Next 16 + shadcn `base-nova` (Base UI); `/api/*` is rewritten to FastAPI so the session cookie is first-party. Real Embedder/Hunter/Gmail raise `NotImplementedError` unless `USE_FAKES=true` until their phases. Gemini pinned to `gemini-3.8-flash` / `gemini-3.5-flash-lite`; set `LLM_RPM`/`LLM_RPD` from AI Studio. CI workflow written but not yet run (repo not pushed). |
 | 1 | not started | | |
 | 2 | not started | | |
 | 3 | not started | | |
