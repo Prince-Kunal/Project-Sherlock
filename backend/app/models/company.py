@@ -8,10 +8,12 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
+    text,
     true,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -25,6 +27,15 @@ EMBEDDING_DIM = 384  # BAAI/bge-small-en-v1.5
 
 class Company(TimestampedBase):
     __tablename__ = "companies"
+    __table_args__ = (
+        Index(
+            "uq_companies_ats_board",
+            "ats_type",
+            "ats_token",
+            unique=True,
+            postgresql_where=text("ats_token IS NOT NULL"),
+        ),
+    )
 
     name: Mapped[str] = mapped_column(String(300))
     domain: Mapped[str | None] = mapped_column(String(255), unique=True)

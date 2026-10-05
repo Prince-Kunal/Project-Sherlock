@@ -3,9 +3,10 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app.models.enums import AtsType, JobSourceType
+from app.services.sources.text import EmploymentType
 
 
 class CompanyRef(BaseModel):
@@ -19,7 +20,7 @@ class CompanyRef(BaseModel):
 
 
 class JobQuery(BaseModel):
-    """An aggregator search (Adzuna, HN), built from a user's target roles."""
+    """An aggregator search (Adzuna), built from a user's target roles."""
 
     what: str
     where: str | None = None
@@ -30,7 +31,8 @@ class RawJob(BaseModel):
     source: JobSourceType
     external_id: str | None
     payload: dict[str, Any]
-    company_name: str | None = None  # aggregators: the posting's company, since there's no CompanyRef
+    company_name: str | None = None
+    company_domain: str | None = None
 
 
 class JobIn(BaseModel):
@@ -43,10 +45,34 @@ class JobIn(BaseModel):
     title: str
     location: str | None = None
     remote: bool | None = None
-    employment_type: str | None = None
+    employment_type: EmploymentType | None = None
     description_text: str = ""
     url: str | None = None
     posted_at: datetime | None = None
+    source_meta: dict[str, Any] | None = None
+
+    @field_validator("title")
+    @classmethod
+    def _title(cls, value: str) -> str:
+        value = " ".join(value.split())
+        if not value:
+            raise ValueError("job has no title")
+        return value[:300]
+
+    @field_validator("location")
+    @classmethod
+    def _location(cls, value: str | None) -> str | None:
+        value = " ".join((value or "").split())
+        return value[:300] or None
+
+    @field_validator("external_id")
+    @classmethod
+    def _external_id(cls, value: str | None) -> str | None:
+        return value[:255] if value else None
+
+
+class MalformedJobError(ValueError):
+    """A source returned a posting we can't use (e.g. no title). It's skipped and counted as failed."""
 
 
 class JobSource(ABC):

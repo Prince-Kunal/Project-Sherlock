@@ -22,6 +22,7 @@ from app.services.llm.client import LLMClient
 from app.services.llm.fake import FakeLLMClient
 from app.services.llm.gemini import GeminiClient
 from app.services.llm.rate_limit import RateLimiter
+from app.services.sources.http import PoliteHttpClient
 
 _FAKE_RESPONSES = Path(__file__).parent / "llm" / "fake_responses"
 
@@ -76,3 +77,9 @@ def get_gmail_client(user_email: str) -> GmailClient:
     if get_settings().use_fakes:
         return _fake_mailboxes.setdefault(user_email, FakeGmailClient(user_email))
     raise NotImplementedError("real Gmail client arrives in Phase 7; set USE_FAKES=true")
+
+
+@lru_cache
+def get_source_http() -> PoliteHttpClient:
+    """Shared polite client (≤ 1 req/s per host) for job sources called from the API."""
+    return PoliteHttpClient()

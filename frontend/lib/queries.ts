@@ -5,6 +5,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiFetch } from "@/lib/api";
 import type {
   AtsReport,
+  Job,
+  JobFeed,
+  JobFilters,
   LLMKeyStatus,
   MasterResume,
   Preferences,
@@ -146,5 +149,40 @@ export function useDeleteLlmKey() {
   return useMutation({
     mutationFn: () => apiFetch<void>("/settings/llm-key", { method: "DELETE" }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.llmKey }),
+  });
+}
+
+function toQuery(filters: JobFilters): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== "") params.set(key, String(value));
+  }
+  return params.toString();
+}
+
+export function useJobs(filters: JobFilters) {
+  return useQuery({
+    queryKey: ["jobs", filters],
+    queryFn: () => apiFetch<JobFeed>(`/jobs?${toQuery(filters)}`),
+    placeholderData: (previous) => previous,
+  });
+}
+
+export function useAddJobUrl() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (url: string) =>
+      apiFetch<Job>("/jobs/manual", {
+        method: "POST",
+        body: JSON.stringify({ url }),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["jobs"] }),
+  });
+}
+
+export function usePollNow() {
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<{ job_id: string | null }>("/admin/poll", { method: "POST" }),
   });
 }

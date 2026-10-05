@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
@@ -15,8 +16,10 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
     true,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import TimestampedBase, UserOwnedBase, str_enum
@@ -29,7 +32,15 @@ class Job(TimestampedBase):
     Effective age = posted_at if present, else first_seen_at."""
 
     __tablename__ = "jobs"
-    __table_args__ = (Index("ix_jobs_source_external_id", "source", "external_id"),)
+    __table_args__ = (
+        Index("ix_jobs_source_external_id", "source", "external_id"),
+        # The feed filters and sorts by effective date = posted_at if known, else first_seen_at.
+        Index(
+            "ix_jobs_active_effective_date",
+            "is_active",
+            func.coalesce(text("posted_at"), text("first_seen_at")),
+        ),
+    )
 
     company_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), index=True)
     source: Mapped[JobSourceType] = mapped_column(str_enum(JobSourceType, "job_source"))
@@ -47,6 +58,8 @@ class Job(TimestampedBase):
     is_active: Mapped[bool] = mapped_column(Boolean, server_default=true())
     dedupe_hash: Mapped[str] = mapped_column(String(64), unique=True)
     embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM))
+    # Source extras, e.g. HN contact hints for Phase 5 ({"contact_emails": [...], "hn_comment_id": ...}).
+    source_meta: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
 
 class JobMatch(UserOwnedBase):

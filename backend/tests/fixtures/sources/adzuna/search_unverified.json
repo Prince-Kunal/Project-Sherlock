@@ -1,0 +1,31 @@
+{
+  "__note": "Hand-written from Adzuna's documented response shape (developer.adzuna.com). Replace with a real recording (record_sources.py) once ADZUNA_APP_ID/ADZUNA_APP_KEY are set.",
+  "count": 2,
+  "mean": 850000,
+  "results": [
+    {
+      "__CLASS__": "Adzuna::API::Response::Job",
+      "id": "4123456789",
+      "title": "Backend <strong>Engineer</strong> Intern",
+      "description": "We are looking for a backend intern to work on Python and PostgreSQL services&hellip;",
+      "created": "2026-10-03T09:15:00Z",
+      "redirect_url": "https://www.adzuna.in/land/ad/4123456789",
+      "company": {"__CLASS__": "Adzuna::API::Response::Company", "display_name": "Example Fintech Pvt Ltd"},
+      "location": {"__CLASS__": "Adzuna::API::Response::Location", "display_name": "Bangalore, Karnataka", "area": ["India", "Karnataka", "Bangalore"]},
+      "category": {"__CLASS__": "Adzuna::API::Response::Category", "label": "IT Jobs", "tag": "it-jobs"},
+      "contract_time": "full_time",
+      "salary_is_predicted": "1"
+    },
+    {
+      "__CLASS__": "Adzuna::API::Response::Job",
+      "id": "4123456790",
+      "title": "Software Developer",
+      "description": "Remote role building React front ends.",
+      "created": "2026-09-30T11:00:00Z",
+      "redirect_url": "https://www.adzuna.in/land/ad/4123456790",
+      "company": {"__CLASS__": "Adzuna::API::Response::Company", "display_name": "Example Labs"},
+      "location": {"__CLASS__": "Adzuna::API::Response::Location", "display_name": "India", "area": ["India"]},
+      "contract_type": "contract"
+    }
+  ]
+}

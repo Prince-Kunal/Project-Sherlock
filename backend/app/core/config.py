@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     embed_model: str = "BAAI/bge-small-en-v1.5"
     embed_min_sim: float = 0.35
 
+    hn_enabled: bool = True  # parse HN "Who is hiring" with the owner's key (needs GEMINI_API_KEY)
+
     hunter_api_key: str = ""
     apollo_api_key: str = ""
     adzuna_app_id: str = ""

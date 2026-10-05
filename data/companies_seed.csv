@@ -1,1 +1,57 @@
 name,domain,ats_type,ats_token,size_hint
+Paytm,paytm.com,lever,paytm,large
+Okta,okta.com,greenhouse,okta,large
+Databricks,databricks.com,greenhouse,databricks,large
+MongoDB,mongodb.com,greenhouse,mongodb,large
+Sarvam AI,sarvam.ai,ashby,sarvam,startup
+Meesho,meesho.com,lever,meesho,large
+Stripe,stripe.com,greenhouse,stripe,large
+InMobi,inmobi.com,greenhouse,inmobi,large
+Sigmoid,sigmoid.com,greenhouse,sigmoid,mid
+GitLab,gitlab.com,greenhouse,gitlab,large
+Zeta,zeta.tech,lever,zeta,mid
+HackerRank,hackerrank.com,greenhouse,hackerrank,mid
+Fivetran,fivetran.com,greenhouse,fivetran,large
+Fam,fampay.in,lever,fampay,startup
+Mindtickle,mindtickle.com,lever,mindtickle,mid
+Elastic,elastic.co,greenhouse,elastic,large
+ElevenLabs,elevenlabs.io,ashby,elevenlabs,mid
+Druva,druva.com,greenhouse,druva,mid
+Twilio,twilio.com,greenhouse,twilio,large
+OpenAI,openai.com,ashby,openai,large
+Coinbase,coinbase.com,greenhouse,coinbase,large
+Datadog,datadoghq.com,greenhouse,datadog,large
+CRED,cred.club,lever,cred,mid
+Groww,groww.in,greenhouse,groww,large
+Cursor (Anysphere),cursor.com,ashby,cursor,mid
+Samsara,samsara.com,greenhouse,samsara,large
+Airbnb,airbnb.com,greenhouse,airbnb,large
+Anthropic,anthropic.com,greenhouse,anthropic,large
+Observe.AI,observe.ai,greenhouse,observeai,startup
+Notion,notion.so,ashby,notion,mid
+Atlan,atlan.com,ashby,atlan,startup
+Temporal,temporal.io,ashby,temporal,mid
+Figma,figma.com,greenhouse,figma,large
+Vercel,vercel.com,greenhouse,vercel,mid
+Grafana Labs,grafana.com,greenhouse,grafanalabs,mid
+Pocket FM,pocketfm.com,lever,pocketfm,mid
+Cloudflare,cloudflare.com,greenhouse,cloudflare,large
+Confluent,confluent.io,ashby,confluent,large
+Cockroach Labs,cockroachlabs.com,greenhouse,cockroachlabs,mid
+Scale AI,scale.com,greenhouse,scaleai,large
+Supabase,supabase.com,ashby,supabase,startup
+PostHog,posthog.com,ashby,posthog,startup
+Airbyte,airbyte.com,ashby,airbyte,startup
+Sentry,sentry.io,ashby,sentry,mid
+Railway,railway.com,ashby,railway,startup
+Resend,resend.com,ashby,resend,startup
+Render,render.com,ashby,render,startup
+Toptal,toptal.com,lever,toptal,mid
+Replit,replit.com,ashby,replit,mid
+Cohere,cohere.com,ashby,cohere,mid
+Linear,linear.app,ashby,linear,startup
+Vanta,vanta.com,ashby,vanta,mid
+Plaid,plaid.com,ashby,plaid,large
+Dropbox,dropbox.com,greenhouse,dropbox,large
+Reddit,reddit.com,greenhouse,reddit,large
+Pinterest,pinterest.com,greenhouse,pinterest,large

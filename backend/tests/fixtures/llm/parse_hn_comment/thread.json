@@ -1,0 +1,137 @@
+[
+  {
+    "comment_id": 49922584,
+    "company": "PrairieLearn",
+    "title": "Full-Stack Software Engineer",
+    "location": "Remote (US only)",
+    "remote": true,
+    "employment_type": "full_time",
+    "url": "https://www.prairielearn.com/jobs-ashby?utm_source=YeEJ5MAKk..."
+  },
+  {
+    "comment_id": 49922606,
+    "company": "We The Flywheel",
+    "title": "Production Designer",
+    "location": null,
+    "remote": true,
+    "employment_type": "contract",
+    "url": "https://wetheflywheel.com/en/careers/production-designer-rem..."
+  },
+  {
+    "comment_id": 49922606,
+    "company": "We The Flywheel",
+    "title": "Production Designer",
+    "location": null,
+    "remote": true,
+    "employment_type": "part_time",
+    "url": "https://wetheflywheel.com/en/careers/production-designer-rem..."
+  },
+  {
+    "comment_id": 49922609,
+    "company": "Sidekick Labs",
+    "title": "Senior Software Engineer",
+    "location": null,
+    "remote": true,
+    "employment_type": "full_time",
+    "url": "https://sidekicklabs.com"
+  },
+  {
+    "comment_id": 49922609,
+    "company": "Sidekick Labs",
+    "title": "R&D Engineer",
+    "location": null,
+    "remote": true,
+    "employment_type": "full_time",
+    "url": "https://sidekicklabs.com"
+  },
+  {
+    "comment_id": 49922609,
+    "company": "Sidekick Labs",
+    "title": "Intelligence and Data Processing Engineer",
+    "location": null,
+    "remote": true,
+    "employment_type": "full_time",
+    "url": "https://sidekicklabs.com"
+  },
+  {
+    "comment_id": 49922616,
+    "company": "PAGNOS",
+    "title": "Cloud Engineer, AWS Serverless (TypeScript/Node.js)",
+    "location": "Germany",
+    "remote": true,
+    "employment_type": "full_time",
+    "url": "https://germantechjobs.de/jobs/PAGNOS-GmbH-Cloud-AI-Engineer..."
+  },
+  {
+    "comment_id": 49922593,
+    "company": "Shepherd",
+    "title": "Senior Full Stack Software Engineer",
+    "location": "San Francisco, CA & New York City, NY",
+    "remote": false,
+    "employment_type": "full_time",
+    "url": "https://shepherdinsurance.com/careers"
+  },
+  {
+    "comment_id": 49922593,
+    "company": "Shepherd",
+    "title": "Machine Learning Engineer",
+    "location": "San Francisco, CA",
+    "remote": false,
+    "employment_type": "full_time",
+    "url": "https://shepherdinsurance.com/careers"
+  },
+  {
+    "comment_id": 49922593,
+    "company": "Shepherd",
+    "title": "AI Product Manager",
+    "location": "San Francisco, CA",
+    "remote": false,
+    "employment_type": "full_time",
+    "url": "https://shepherdinsurance.com/careers"
+  },
+  {
+    "comment_id": 49922593,
+    "company": "Shepherd",
+    "title": "Staff Full Stack Software Engineer",
+    "location": "New York City, NY",
+    "remote": false,
+    "employment_type": "full_time",
+    "url": "https://shepherdinsurance.com/careers"
+  },
+  {
+    "comment_id": 49922615,
+    "company": "Open Education Applications / Neon",
+    "title": "Senior Platform & DevOps Engineer",
+    "location": "Utrecht, The Netherlands",
+    "remote": null,
+    "employment_type": null,
+    "url": "https://openeducation.foundation"
+  },
+  {
+    "comment_id": 49922615,
+    "company": "Open Education Applications / Neon",
+    "title": "Lead Platform & DevOps Engineer",
+    "location": "Utrecht, The Netherlands",
+    "remote": null,
+    "employment_type": null,
+    "url": "https://openeducation.foundation"
+  },
+  {
+    "comment_id": 49922615,
+    "company": "Open Education Applications / Neon",
+    "title": "Senior Frontend Engineer",
+    "location": "Utrecht, The Netherlands",
+    "remote": null,
+    "employment_type": null,
+    "url": "https://openeducation.foundation"
+  },
+  {
+    "comment_id": 49922615,
+    "company": "Open Education Applications / Neon",
+    "title": "Senior Full-Stack Engineer",
+    "location": "Utrecht, The Netherlands",
+    "remote": null,
+    "employment_type": null,
+    "url": "https://openeducation.foundation"
+  }
+]

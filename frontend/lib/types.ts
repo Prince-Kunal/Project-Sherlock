@@ -107,3 +107,32 @@ export type LLMKeyStatus = {
   owner_fallback_allowed: boolean;
   notice: string;
 };
+
+export type EmploymentType =
+  "internship" | "full_time" | "part_time" | "contract";
+
+export type Job = {
+  id: string;
+  title: string;
+  company: { id: string; name: string; domain: string | null };
+  location: string | null;
+  remote: boolean | null;
+  employment_type: EmploymentType | null;
+  url: string | null;
+  source: "greenhouse" | "lever" | "ashby" | "adzuna" | "hn" | "manual";
+  posted_at: string | null;
+  first_seen_at: string;
+  effective_date: string;
+  age_days: number;
+};
+
+export type JobFeed = { items: Job[]; total: number; max_age_days: number };
+
+export type JobFilters = {
+  max_age_days?: number;
+  employment_type?: EmploymentType;
+  remote?: boolean;
+  q?: string;
+  limit: number;
+  offset: number;
+};
