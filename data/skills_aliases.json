@@ -1,0 +1,253 @@
+{
+  "algorithms": [],
+  "angular": [
+    "angular.js",
+    "angularjs"
+  ],
+  "arduino": [],
+  "aws": [
+    "amazon web services"
+  ],
+  "azure": [
+    "microsoft azure"
+  ],
+  "bash": [
+    "shell",
+    "shell scripting"
+  ],
+  "bitcoin": [],
+  "blockchain": [
+    "web3"
+  ],
+  "c": [
+    "c language"
+  ],
+  "c#": [
+    "c sharp",
+    "csharp"
+  ],
+  "c++": [
+    "c plus plus",
+    "cplusplus",
+    "cpp"
+  ],
+  "cassandra": [],
+  "ci/cd": [
+    "ci cd",
+    "cicd",
+    "continuous integration"
+  ],
+  "computer networks": [
+    "networking"
+  ],
+  "computer vision": [],
+  "concurrency": [
+    "multithreading"
+  ],
+  "crow": [
+    "crow framework"
+  ],
+  "css": [
+    "css3"
+  ],
+  "dart": [],
+  "data analysis": [],
+  "data science": [],
+  "data structures": [
+    "data structures & algorithms",
+    "data structures and algorithms",
+    "dsa"
+  ],
+  "dbms": [
+    "database management systems"
+  ],
+  "deep learning": [
+    "dl"
+  ],
+  "distributed systems": [],
+  "django": [],
+  "docker": [],
+  "dynamodb": [],
+  "elasticsearch": [
+    "elastic search"
+  ],
+  "embedded systems": [
+    "embedded"
+  ],
+  "esp32": [],
+  "express.js": [
+    "express",
+    "expressjs"
+  ],
+  "fastapi": [
+    "fast api"
+  ],
+  "figma": [],
+  "firebase": [],
+  "flask": [],
+  "flutter": [],
+  "gcp": [
+    "google cloud",
+    "google cloud platform"
+  ],
+  "git": [],
+  "github": [],
+  "github actions": [],
+  "go": [
+    "golang"
+  ],
+  "graphql": [],
+  "grpc": [],
+  "html": [
+    "html5"
+  ],
+  "hugging face": [
+    "huggingface"
+  ],
+  "iot": [
+    "internet of things"
+  ],
+  "java": [],
+  "javascript": [
+    "ecmascript",
+    "es6",
+    "js"
+  ],
+  "jira": [],
+  "kafka": [
+    "apache kafka"
+  ],
+  "keras": [],
+  "kotlin": [],
+  "kubernetes": [
+    "k8s"
+  ],
+  "large language models": [
+    "llm",
+    "llms"
+  ],
+  "linux": [
+    "ubuntu"
+  ],
+  "machine learning": [
+    "ml"
+  ],
+  "matlab": [],
+  "mongodb": [
+    "mongo"
+  ],
+  "mujoco": [],
+  "mysql": [],
+  "natural language processing": [
+    "nlp"
+  ],
+  "next.js": [
+    "next js",
+    "nextjs"
+  ],
+  "nginx": [],
+  "node.js": [
+    "node",
+    "node js",
+    "nodejs"
+  ],
+  "numpy": [],
+  "nvidia isaac sim": [
+    "isaac sim"
+  ],
+  "object-oriented programming": [
+    "object oriented programming",
+    "oop",
+    "oops"
+  ],
+  "opencv": [
+    "open cv"
+  ],
+  "operating systems": [
+    "os"
+  ],
+  "pandas": [],
+  "php": [],
+  "plc programming": [
+    "ladder logic",
+    "plc",
+    "programmable logic controllers"
+  ],
+  "postgresql": [
+    "pgsql",
+    "postgres",
+    "psql"
+  ],
+  "postman": [],
+  "python": [
+    "py",
+    "python3"
+  ],
+  "pytorch": [
+    "torch"
+  ],
+  "r": [
+    "r language"
+  ],
+  "rabbitmq": [],
+  "react": [
+    "react js",
+    "react.js",
+    "reactjs"
+  ],
+  "react native": [],
+  "redis": [],
+  "redux": [],
+  "rest api": [
+    "rest apis",
+    "restful",
+    "restful api"
+  ],
+  "retrieval-augmented generation": [
+    "rag"
+  ],
+  "ros 2": [
+    "ros",
+    "ros2"
+  ],
+  "ruby": [],
+  "rust": [],
+  "scala": [],
+  "scikit-learn": [
+    "scikit learn",
+    "sklearn"
+  ],
+  "solidity": [],
+  "spring boot": [
+    "spring",
+    "springboot"
+  ],
+  "sql": [],
+  "sqlite": [],
+  "svelte": [],
+  "swift": [],
+  "system design": [
+    "systems design"
+  ],
+  "tailwind css": [
+    "tailwind",
+    "tailwindcss"
+  ],
+  "tensorflow": [
+    "tf"
+  ],
+  "terraform": [],
+  "typescript": [
+    "ts"
+  ],
+  "vercel": [],
+  "vue.js": [
+    "vue",
+    "vue js",
+    "vuejs"
+  ],
+  "websockets": [
+    "web sockets",
+    "websocket"
+  ]
+}

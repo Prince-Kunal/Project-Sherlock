@@ -1,0 +1,57 @@
+<#- ATS-friendly resume (PLAN.md §6.1). Jinja uses angle-bracket delimiters (see render.py) to stay clear of Typst.
+    Every user-provided value is inserted with the `ts` filter as a Typst *string literal*, so it is
+    rendered as plain text and can never be interpreted as Typst markup. -#>
+#set document(title: << doc_title|ts >>, author: << basics.name|ts >>)
+#set page(paper: "a4", margin: (x: 0.6in, y: 0.5in))
+#set text(
+  font: "Source Sans 3",
+  size: 10.5pt,
+  lang: "en",
+  ligatures: false,
+  discretionary-ligatures: false,
+  historical-ligatures: false,
+  hyphenate: false,
+)
+#set par(justify: false, leading: 0.45em, spacing: 0.5em)
+#set list(marker: [•], indent: 0.15em, body-indent: 0.45em, spacing: 0.4em)
+#show heading.where(level: 1): it => block(above: 0.85em, below: 0.4em, width: 100%)[
+  #text(size: 12pt, weight: "bold", it.body)
+  #v(-0.65em)
+  #line(length: 100%, stroke: 0.5pt)
+]
+
+#let entry(title, meta) = block(above: 0.6em, below: 0.35em, breakable: false)[
+  #text(weight: "semibold", title)
+  #if meta != "" [ \ #text(fill: luma(70), meta)]
+]
+
+#block(below: 0.6em)[
+  #text(size: 18pt, weight: "bold", << basics.name|ts >>)
+<% if contact %>
+  \
+  <% for item in contact %><% if item.url %>#box(link(<< item.url|ts >>, << item.text|ts >>))<% else %>#box(<< item.text|ts >>)<% endif %><% if not loop.last %>#"  |  "<% endif %><% endfor %>
+
+<% endif %>
+]
+<% if summary %>
+#par(<< summary|ts >>)
+<% endif %>
+<% for section in sections %>
+= #<< section.heading|ts >>
+<% if section.kind == "skills" %>
+<% for line in section.lines %>
+#par[#text(weight: "semibold", << (line.category ~ ":")|ts >>) #<< line["joined"]|ts >>]
+<% endfor %>
+<% else %>
+<% for e in section.entries %>
+<% if e.title %>
+#entry(<< e.title|ts >>, << e.meta|ts >>)
+<% endif %>
+<% if e.bullets %>
+#list(
+<% for b in e.bullets %>  << b|ts >>,
+<% endfor %>)
+<% endif %>
+<% endfor %>
+<% endif %>
+<% endfor %>

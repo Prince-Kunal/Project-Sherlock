@@ -1,0 +1,252 @@
+{
+  "basics": {
+    "name": "Aarav Menon",
+    "location": null,
+    "links": [
+      {
+        "label": "LinkedIn",
+        "url": "https://www.linkedin.com/in/aarav-menon-dev"
+      },
+      {
+        "label": "GitHub",
+        "url": "https://github.com/aaravmenon"
+      },
+      {
+        "label": "LeetCode",
+        "url": "https://leetcode.com/u/aaravm"
+      }
+    ]
+  },
+  "summary": "Information Technology undergraduate with strong foundations in data structures, algorithms and full-stack web development. Enjoys building fast, reliable software and learning new tools.",
+  "education": [
+    {
+      "institution": "Example College of Engineering",
+      "degree": "B.Tech",
+      "field": "Information Technology",
+      "location": "Chennai",
+      "start": "2024",
+      "end": "2028",
+      "gpa": "9.12",
+      "bullets": [
+        {
+          "text": "Coursework: Data Structures, OOP, DBMS, Operating Systems, Computer Networks",
+          "skills": [
+            "data structures",
+            "dbms"
+          ]
+        }
+      ]
+    },
+    {
+      "institution": "Example Online Degree Programme",
+      "degree": "B.S. in Programming and Data Science Diploma in Programming",
+      "field": "Programming and Data Science",
+      "location": null,
+      "start": null,
+      "end": "present",
+      "gpa": "8.8",
+      "bullets": []
+    },
+    {
+      "institution": "Example Junior College",
+      "degree": "Class XII (PUC)",
+      "field": null,
+      "location": "Bengaluru",
+      "start": null,
+      "end": "2024",
+      "gpa": "97.1%",
+      "bullets": []
+    }
+  ],
+  "experience": [
+    {
+      "org": "Example Tech Academy",
+      "role": "Virtual Internship, AI Agents",
+      "location": null,
+      "start": "2026-06",
+      "end": "present",
+      "bullets": [
+        {
+          "text": "Building an AI agent that shortlists internship postings and drafts application notes, as part of an 8-week programme.",
+          "skills": [
+            "ai agent",
+            "llm"
+          ]
+        },
+        {
+          "text": "Attend weekly instructor-led sessions on LLM tooling and evaluation.",
+          "skills": [
+            "llm"
+          ]
+        }
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "InkTrace – Handwriting Coach for Children",
+      "link": null,
+      "tech": [
+        "Python",
+        "Flask",
+        "JavaScript",
+        "NumPy",
+        "ESP32"
+      ],
+      "start": "2026-02",
+      "end": null,
+      "bullets": [
+        {
+          "text": "Built an IoT pen using an ESP32 that streams motion-sensor data to a laptop over Wi-Fi.",
+          "skills": [
+            "esp32",
+            "iot"
+          ]
+        },
+        {
+          "text": "Recognised handwritten letters with Dynamic Time Warping and k-nearest neighbours at 91% accuracy on 2,400 samples.",
+          "skills": [
+            "dynamic time warping",
+            "k-nearest neighbours",
+            "python"
+          ]
+        },
+        {
+          "text": "Developed a Flask backend and web dashboard showing real-time predictions to teachers.",
+          "skills": [
+            "flask",
+            "python"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "QuickNote – Collaborative Markdown Editor",
+      "link": null,
+      "tech": [
+        "C++",
+        "Crow",
+        "React",
+        "WebSockets"
+      ],
+      "start": "2026-05",
+      "end": null,
+      "bullets": [
+        {
+          "text": "Built a web text editor with a C++ backend and React frontend supporting live collaboration for 10 users.",
+          "skills": [
+            "c++",
+            "react",
+            "websockets"
+          ]
+        },
+        {
+          "text": "Implemented autocomplete with a Trie ranked by a max-heap, returning suggestions in under 5 ms.",
+          "skills": [
+            "trie",
+            "max-heap",
+            "algorithms"
+          ]
+        },
+        {
+          "text": "Added undo/redo using two stacks and a REST API for saving documents.",
+          "skills": [
+            "rest api",
+            "stack"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Pantry Pal – Meal Planner",
+      "link": null,
+      "tech": [
+        "Node.js",
+        "Express",
+        "PostgreSQL",
+        "Vercel"
+      ],
+      "start": "2025-10",
+      "end": null,
+      "bullets": [
+        {
+          "text": "Built and deployed a recipe search app with prefix search, cuisine filters and saved recipes.",
+          "skills": [
+            "node.js",
+            "express"
+          ]
+        },
+        {
+          "text": "Designed the PostgreSQL schema and an admin dashboard for moderating 300+ community recipes.",
+          "skills": [
+            "postgresql"
+          ]
+        }
+      ]
+    }
+  ],
+  "skills": [
+    {
+      "category": "Languages",
+      "items": [
+        "C",
+        "C++",
+        "Java",
+        "Python"
+      ]
+    },
+    {
+      "category": "Web",
+      "items": [
+        "HTML",
+        "CSS",
+        "JavaScript",
+        "React"
+      ]
+    },
+    {
+      "category": "Database",
+      "items": [
+        "PostgreSQL"
+      ]
+    },
+    {
+      "category": "Tools",
+      "items": [
+        "Git",
+        "GitHub",
+        "NumPy",
+        "Pandas"
+      ]
+    }
+  ],
+  "achievements": [
+    {
+      "text": "Solved 250+ data structures and algorithms problems on LeetCode and HackerRank.",
+      "skills": [
+        "data structures",
+        "algorithms"
+      ]
+    },
+    {
+      "text": "Completed a cloud engineering certificate on an online learning platform.",
+      "skills": [
+        "cloud engineering"
+      ]
+    },
+    {
+      "text": "Secured 2nd place at a national engineering design fair (2026) for InkTrace.",
+      "skills": []
+    },
+    {
+      "text": "Deputy Head, Competitive Programming Wing of the college computer society; run monthly contests for juniors.",
+      "skills": [
+        "competitive programming"
+      ]
+    },
+    {
+      "text": "Grade 7 certificate in classical guitar; teach beginners on weekends.",
+      "skills": []
+    }
+  ]
+}

@@ -1,11 +1,15 @@
 import { EmptyPage } from "@/components/empty-page";
+import { LlmKeyCard } from "@/components/settings/llm-key-card";
 
 export default function SettingsPage() {
   return (
-    <EmptyPage
-      title="Settings"
-      phase={9}
-      description="Pause switch, daily caps, send window, Gmail connection and data deletion will live here."
-    />
+    <div className="flex flex-col gap-6">
+      <LlmKeyCard />
+      <EmptyPage
+        title="More settings"
+        phase={9}
+        description="Pause switch, Gmail connection and data deletion will live here."
+      />
+    </div>
   );
 }

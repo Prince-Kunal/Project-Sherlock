@@ -1,6 +1,6 @@
 .env
 .DS_Store
-data/files/
+**/data/files/
 
 # Python
 __pycache__/

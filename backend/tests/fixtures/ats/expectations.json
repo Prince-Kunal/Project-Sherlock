@@ -1,0 +1,19 @@
+{
+  "name": "Kavya Raman",
+  "email": "kavya.raman@example.com",
+  "phone": "+91 90000 44444",
+  "headings": [
+    "Education",
+    "Experience",
+    "Projects",
+    "Skills",
+    "Achievements"
+  ],
+  "bullets": [
+    "Built an efficient reconciliation workflow in Python and PostgreSQL that cut manual review time by 35% for the finance team",
+    "Added profiling and fixed slow queries in the payments service, reducing p95 latency from 420 ms to 180 ms",
+    "Designed a log shipper in Go with Redis-backed buffering that handles fluctuating traffic of 5k lines per second",
+    "Wrote a configuration file linter that flags conflicting filters before deploys",
+    "Finalist, national student hackathon 2025 (top 10 of 400 teams)"
+  ]
+}

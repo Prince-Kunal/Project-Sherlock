@@ -1,0 +1,165 @@
+{
+  "basics": {
+    "name": "Rohan Das",
+    "location": null,
+    "links": [
+      {
+        "label": "LinkedIn",
+        "url": "https://linkedin.com/in/rohandas-oss"
+      },
+      {
+        "label": "GitHub",
+        "url": "https://github.com/rohan-das-oss"
+      },
+      {
+        "label": "Website",
+        "url": "https://rohandas.example.dev"
+      }
+    ]
+  },
+  "summary": null,
+  "education": [
+    {
+      "institution": "Example School of Technology",
+      "degree": "Bachelor of Technology",
+      "field": "Computer Science and Engineering",
+      "location": "Bengaluru",
+      "start": "2025",
+      "end": "2029",
+      "gpa": "8.61/10",
+      "bullets": []
+    }
+  ],
+  "experience": [
+    {
+      "org": "Example Office Suite",
+      "role": "Open Source Contributor",
+      "location": null,
+      "start": "2026-01",
+      "end": "present",
+      "bullets": [
+        {
+          "text": "Fixed a long-standing spreadsheet bug where auto-filled decimal series produced rounding errors instead of 0.3); added a regression test, merged after five review rounds",
+          "skills": []
+        },
+        {
+          "text": "Diagnosed a rendering bug shared by the word processor and presentation apps by tracing a shared layout module",
+          "skills": []
+        }
+      ]
+    },
+    {
+      "org": "Example Observability Project",
+      "role": "Open Source Contributor",
+      "location": null,
+      "start": "2026-05",
+      "end": "present",
+      "bullets": [
+        {
+          "text": "Built a registry crawler for JavaScript instrumentation packages, tracking 52 entries, merged after 12 rounds of maintainer review",
+          "skills": [
+            "javascript"
+          ]
+        },
+        {
+          "text": "Fixed a telemetry SDK bug that sent local development data to production, causing CORS errors",
+          "skills": []
+        },
+        {
+          "text": "Merged 18+ pull requests and wrote onboarding documentation for new contributors",
+          "skills": []
+        }
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "TxScope - Bitcoin Transaction Explorer",
+      "link": "https://github.com/rohan-das-oss/txscope",
+      "tech": [],
+      "start": "2026",
+      "end": null,
+      "bullets": [
+        {
+          "text": "Wrote a raw Bitcoin transaction parser with no external libraries, supporting SegWit and Taproot",
+          "skills": []
+        },
+        {
+          "text": "Exposed the parser as a CLI, a REST API and a web visualiser",
+          "skills": [
+            "rest api"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Nyaya Search - Retrieval System for Legal Documents",
+      "link": "https://github.com/rohan-das-oss/nyaya-search",
+      "tech": [],
+      "start": "2026",
+      "end": null,
+      "bullets": [
+        {
+          "text": "Combined BM25 keyword search with embedding search and re-ranking so every answer cites a source",
+          "skills": [
+            "bm25"
+          ]
+        },
+        {
+          "text": "Built a 90-question evaluation suite run in CI that blocks merges which reduce accuracy",
+          "skills": []
+        }
+      ]
+    }
+  ],
+  "skills": [
+    {
+      "category": "Languages",
+      "items": [
+        "C++",
+        "Python",
+        "Java",
+        "JavaScript",
+        "TypeScript"
+      ]
+    },
+    {
+      "category": "Backend / Frontend",
+      "items": [
+        "Node.js",
+        "Express.js",
+        "Django",
+        "React",
+        "Next.js",
+        "HTML",
+        "CSS"
+      ]
+    },
+    {
+      "category": "Databases",
+      "items": [
+        "PostgreSQL",
+        "MongoDB"
+      ]
+    },
+    {
+      "category": "Tools",
+      "items": [
+        "Git",
+        "Docker",
+        "GitHub Actions",
+        "Postman"
+      ]
+    }
+  ],
+  "achievements": [
+    {
+      "text": "Student Developer Ambassador, Example School of Technology - May 2026 - Jul 2026",
+      "skills": []
+    },
+    {
+      "text": "Organised workshops and tech talks on cloud developer tools for 200+ students",
+      "skills": []
+    }
+  ]
+}

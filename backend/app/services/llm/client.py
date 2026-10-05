@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from pydantic import TypeAdapter, ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from app.services.llm.cache import LLMCache
 
@@ -44,6 +44,14 @@ class LLMQuotaExhaustedError(LLMError):
 
 class LLMConfigError(LLMError):
     """Missing API key or similar misconfiguration."""
+
+
+class LLMAuthError(LLMError):
+    """The provider rejected the API key."""
+
+
+class KeyCheck(BaseModel):
+    ok: bool
 
 
 @dataclass(frozen=True)
@@ -101,6 +109,17 @@ class LLMClient(ABC):
                 await self._cache.set(cache_key, raw)
             return result
         raise LLMOutputError(request.prompt_name, errors)
+
+    async def verify_api_key(self, api_key: str) -> None:
+        """One tiny request with `api_key`; raises LLMAuthError if the provider rejects it."""
+        request = LLMRequest(
+            prompt_name="verify_key",
+            prompt_version="1",
+            prompt='Reply with the JSON object {"ok": true}.',
+            api_key=api_key,
+            use_cache=False,
+        )
+        await self.generate(request, KeyCheck)
 
     @abstractmethod
     async def _complete_json(self, request: LLMRequest, prompt: str, schema: dict[str, Any]) -> str:

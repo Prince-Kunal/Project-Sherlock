@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, health
+from app.api.routes import auth, health, preferences, resume, settings
 from app.core.config import get_settings
 from app.core.db import get_engine
 from app.core.logging import configure_logging
@@ -20,17 +20,20 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     configure_logging()
-    settings = get_settings()
+    config = get_settings()
     app = FastAPI(title="Sherlock", lifespan=lifespan)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins,
+        allow_origins=config.cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
     app.include_router(health.router)
     app.include_router(auth.router)
+    app.include_router(resume.router)
+    app.include_router(preferences.router)
+    app.include_router(settings.router)
     return app
 
 

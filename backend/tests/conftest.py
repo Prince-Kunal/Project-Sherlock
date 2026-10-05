@@ -16,10 +16,12 @@ os.environ.update(
         "DEV_AUTH": "true",
         "USE_FAKES": "true",
         "GEMINI_API_KEY": "",
+        "ALLOW_OWNER_KEY_FALLBACK": "false",
     }
 )
 
-from collections.abc import AsyncIterator
+import json
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 
 import pytest
@@ -30,12 +32,16 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import create_session_token
 from app.core.config import get_settings
 from app.core.db import get_sessionmaker
 from app.core.redis import get_redis
-from app.models import Base
+from app.models import Base, User
+from app.services.llm.fake import FakeLLMClient
+from app.services.registry import get_llm_client
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -72,3 +78,50 @@ async def client() -> AsyncIterator[AsyncClient]:
         AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c,
     ):
         yield c
+
+
+@pytest.fixture(autouse=True)
+def storage_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    monkeypatch.setattr(get_settings(), "storage_dir", str(tmp_path / "files"))
+    return tmp_path / "files"
+
+
+def recorded(prompt: str, name: str) -> object:
+    """A recorded real LLM response from tests/fixtures/llm/<prompt>/<name>.json."""
+    return json.loads((FIXTURES / "llm" / prompt / f"{name}.json").read_text())
+
+
+@pytest.fixture
+def fake_llm() -> Iterator[FakeLLMClient]:
+    """Injected in place of the real LLM client for every request made through `client`."""
+    from app.main import app
+
+    fake = FakeLLMClient(rejected_keys={"AIza-rejected-key-000"})
+    app.dependency_overrides[get_llm_client] = lambda: fake
+    yield fake
+    app.dependency_overrides.pop(get_llm_client, None)
+
+
+@pytest.fixture
+async def auth_client(client: AsyncClient) -> AsyncClient:
+    """`client` logged in as the seeded dev user."""
+    response = await client.post("/auth/dev-login")
+    assert response.status_code == 200
+    return client
+
+
+@pytest.fixture
+async def with_llm_key(auth_client: AsyncClient, fake_llm: FakeLLMClient) -> AsyncClient:
+    """Logged-in client whose user has saved a (fake-verified) Gemini key."""
+    response = await auth_client.put("/settings/llm-key", json={"api_key": "AIza-test-key-1234567890"})
+    assert response.status_code == 200, response.text
+    return auth_client
+
+
+@pytest.fixture
+async def other_user_headers(session: AsyncSession) -> dict[str, str]:
+    """Auth headers for a second, unrelated user (data-isolation tests, invariant 5)."""
+    user = User(email="other@example.com", name="Other User")
+    session.add(user)
+    await session.commit()
+    return {"Authorization": f"Bearer {create_session_token(user.id)}"}

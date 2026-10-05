@@ -13,6 +13,7 @@ from google.genai import types
 
 from app.services.llm.cache import LLMCache
 from app.services.llm.client import (
+    LLMAuthError,
     LLMClient,
     LLMConfigError,
     LLMQuotaExhaustedError,
@@ -24,6 +25,11 @@ from app.services.llm.rate_limit import RateLimiter
 log = logging.getLogger(__name__)
 
 _RETRYABLE_SERVER_CODES = {500, 502, 503, 504}
+
+
+def _is_auth_error(err: genai_errors.APIError) -> bool:
+    details = json.dumps(err.details, default=str)
+    return err.code in (401, 403) or (err.code == 400 and "API_KEY_INVALID" in details)
 
 
 def _is_daily_quota_error(err: genai_errors.APIError) -> bool:
@@ -85,6 +91,8 @@ class GeminiClient(LLMClient):
             try:
                 return await self._call(api_key, model, prompt, schema, prompt_name)
             except genai_errors.APIError as err:
+                if _is_auth_error(err):
+                    raise LLMAuthError(f"Gemini rejected the API key ({err.code} {err.status})") from err
                 if err.code == 429 and _is_daily_quota_error(err):
                     await self._limiter.mark_exhausted(api_key, model)
                     raise LLMQuotaExhaustedError(f"Gemini daily quota exhausted for {model}") from err

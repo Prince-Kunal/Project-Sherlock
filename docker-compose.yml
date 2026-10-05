@@ -8,9 +8,11 @@ x-backend: &backend
     DATABASE_URL: postgresql+asyncpg://sherlock:sherlock@postgres:5432/sherlock
     REDIS_URL: redis://redis:6379/0
     STORAGE_DIR: /data/files
+    DATA_DIR: /repo-data
   volumes:
     - ./backend:/app
     - /app/.venv
+    - ./data:/repo-data:ro
     - files:/data/files
   depends_on:
     postgres:

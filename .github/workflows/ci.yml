@@ -32,6 +32,13 @@ jobs:
       TEST_REDIS_URL: redis://localhost:6379/15
     steps:
       - uses: actions/checkout@v4
+      - name: Install poppler and typst (resume rendering + ATS check)
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends poppler-utils
+          curl -fsSL https://github.com/typst/typst/releases/download/v0.15.1/typst-x86_64-unknown-linux-musl.tar.xz \
+            | tar -xJ -C /tmp
+          sudo mv /tmp/typst-x86_64-unknown-linux-musl/typst /usr/local/bin/typst
+          typst --version
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true

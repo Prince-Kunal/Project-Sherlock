@@ -1,0 +1,186 @@
+{
+  "basics": {
+    "name": "Meera Iyer",
+    "location": "Bengaluru, India",
+    "links": [
+      {
+        "label": "LinkedIn",
+        "url": "https://www.linkedin.com/in/meera-iyer-robotics"
+      },
+      {
+        "label": "GitHub",
+        "url": "https://github.com/meeraiyer"
+      }
+    ]
+  },
+  "summary": null,
+  "education": [
+    {
+      "institution": "Example University of Technology",
+      "degree": "B.Tech",
+      "field": "Robotics and Artificial Intelligence",
+      "location": "Bengaluru, India",
+      "start": "2024-08",
+      "end": "present",
+      "gpa": "8.91 / 10.0",
+      "bullets": []
+    },
+    {
+      "institution": "Example PU College",
+      "degree": "Higher Secondary Education",
+      "field": "Physics, Chemistry, Mathematics, Computer Science",
+      "location": "Bengaluru, India",
+      "start": "2022-06",
+      "end": "2024-05",
+      "gpa": "94.2%",
+      "bullets": []
+    }
+  ],
+  "experience": [
+    {
+      "org": "Example Automation Labs",
+      "role": "Robotics Software Intern",
+      "location": null,
+      "start": "2026-03",
+      "end": "2026-07",
+      "bullets": [
+        {
+          "text": "Developed computer-vision checks for a packaging line that cut mis-labelled boxes by 40%.",
+          "skills": [
+            "computer vision"
+          ]
+        },
+        {
+          "text": "Built a digital-twin dashboard showing live robot cell status for floor supervisors.",
+          "skills": []
+        },
+        {
+          "text": "Researched predictive-maintenance signals for industrial arms using vibration data.",
+          "skills": []
+        }
+      ]
+    },
+    {
+      "org": "Example Industrial Training Centre",
+      "role": "PLC Programming Intern",
+      "location": null,
+      "start": "2025-08",
+      "end": "2026-02",
+      "bullets": [
+        {
+          "text": "Programmed and tested PLC ladder logic for 4 automation rigs, including a conveyor sorter and a press.",
+          "skills": [
+            "plc ladder logic"
+          ]
+        },
+        {
+          "text": "Wrote technical documentation and test reports for each completed rig.",
+          "skills": []
+        }
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "Warehouse Picker Arm Simulation",
+      "link": "https://github.com/meeraiyer/picker-sim",
+      "tech": [
+        "Isaac Sim",
+        "Python",
+        "ROS 2"
+      ],
+      "start": "2025-10",
+      "end": "2025-12",
+      "bullets": [
+        {
+          "text": "Simulated a 7-DoF arm picking mixed items from bins, controlled by a custom Python ROS 2 node.",
+          "skills": [
+            "python",
+            "ros 2"
+          ]
+        },
+        {
+          "text": "Implemented joint-space control and gripper sequencing with a 94% pick success rate in simulation.",
+          "skills": []
+        }
+      ]
+    },
+    {
+      "name": "Ship Detection in Satellite Images",
+      "link": "https://github.com/meeraiyer/ship-detect",
+      "tech": [
+        "PyTorch",
+        "Object Detection",
+        "OpenCV"
+      ],
+      "start": "2026-06",
+      "end": "2026-07",
+      "bullets": [
+        {
+          "text": "Trained an oriented object detector on aerial imagery and evaluated it with mAP, precision and recall.",
+          "skills": [
+            "pytorch",
+            "object detection"
+          ]
+        }
+      ]
+    }
+  ],
+  "skills": [
+    {
+      "category": "Languages",
+      "items": [
+        "Python",
+        "C++",
+        "C#"
+      ]
+    },
+    {
+      "category": "AI / ML",
+      "items": [
+        "Deep Learning",
+        "Machine Learning",
+        "Computer Vision"
+      ]
+    },
+    {
+      "category": "Robotics",
+      "items": [
+        "ROS 2",
+        "NVIDIA Isaac Sim",
+        "MuJoCo",
+        "OpenCV",
+        "Linux"
+      ]
+    },
+    {
+      "category": "Automation",
+      "items": [
+        "PLC Programming",
+        "Pneumatics"
+      ]
+    },
+    {
+      "category": "Tools",
+      "items": [
+        "Git",
+        "GitHub",
+        "Docker"
+      ]
+    }
+  ],
+  "achievements": [
+    {
+      "text": "Stability-Aware Grasp Planning for Mobile Manipulators in MuJoCo 2026 Example International Robotics Conference (ExRC 2026) · Paper ID: EXRC-2026-0417",
+      "skills": [
+        "mujoco"
+      ]
+    },
+    {
+      "text": "First-author paper proposing a MuJoCo framework that adds centre-of-mass constraints to grasp planning, improving task success over a baseline controller.",
+      "skills": [
+        "mujoco"
+      ]
+    }
+  ]
+}

@@ -4,7 +4,7 @@ COMPOSE := docker compose
 
 up: ## Build and start every service (postgres, redis, backend, worker, frontend)
 	@test -f .env || (cp .env.example .env && echo "Created .env from .env.example; set FERNET_KEY and AUTH_SECRET")
-	$(COMPOSE) up -d --build
+	$(COMPOSE) up -d --build --renew-anon-volumes
 	@echo "Frontend: http://localhost:3000   API: http://localhost:8000/health"
 
 down:

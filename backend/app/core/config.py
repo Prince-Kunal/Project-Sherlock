@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, model_validator
@@ -15,6 +16,9 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://sherlock:sherlock@localhost:5433/sherlock"
     redis_url: str = "redis://localhost:6380/0"
     storage_dir: str = "/data/files"
+    # Repo-root data/ (skills aliases, company seed). docker-compose mounts it and sets DATA_DIR.
+    data_dir: str = str(Path(__file__).resolve().parents[3] / "data")
+    max_upload_bytes: int = 5 * 1024 * 1024
     fernet_key: str = ""
 
     dev_auth: bool = False

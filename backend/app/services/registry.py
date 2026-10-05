@@ -4,7 +4,9 @@ Everything that talks to the outside world is obtained here, so tests and `USE_F
 the whole app onto fakes without touching call sites.
 """
 
+import json
 from functools import lru_cache
+from pathlib import Path
 
 from app.core.config import Settings, get_settings
 from app.core.redis import get_redis
@@ -21,10 +23,20 @@ from app.services.llm.fake import FakeLLMClient
 from app.services.llm.gemini import GeminiClient
 from app.services.llm.rate_limit import RateLimiter
 
+_FAKE_RESPONSES = Path(__file__).parent / "llm" / "fake_responses"
+
+
+def build_fake_llm_client() -> FakeLLMClient:
+    """For USE_FAKES=true local runs: canned answers so the UI works without an API key."""
+    client = FakeLLMClient()
+    for path in sorted(_FAKE_RESPONSES.glob("*.json")):
+        client.add_response(path.stem, json.loads(path.read_text()))
+    return client
+
 
 def build_llm_client(settings: Settings) -> LLMClient:
     if settings.use_fakes:
-        return FakeLLMClient()
+        return build_fake_llm_client()
     redis = get_redis()
     cache = LLMCache(redis, settings.llm_cache_ttl_seconds)
     if settings.llm_provider == "anthropic":
