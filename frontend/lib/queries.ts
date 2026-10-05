@@ -16,6 +16,7 @@ import type {
   Preferences,
   ResumeOut,
   ResumeVersion,
+  TailorPreview,
 } from "@/lib/types";
 
 export const keys = {
@@ -225,5 +226,14 @@ export function useRefreshMatches() {
   return useMutation({
     mutationFn: () =>
       apiFetch<{ queued: boolean }>("/matches/refresh", { method: "POST" }),
+  });
+}
+
+export function useTailorPreview() {
+  return useMutation({
+    mutationFn: (matchId: string) =>
+      apiFetch<TailorPreview>(`/matches/${matchId}/tailor-preview`, {
+        method: "POST",
+      }),
   });
 }

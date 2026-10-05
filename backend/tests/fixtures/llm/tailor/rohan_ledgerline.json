@@ -1,0 +1,53 @@
+[
+  {
+    "section_order": [
+      "education",
+      "experience",
+      "projects",
+      "skills",
+      "achievements"
+    ],
+    "selected_bullet_ids": [
+      "proj1-b2",
+      "proj2-b2",
+      "exp1-b1",
+      "exp2-b3",
+      "exp2-b1",
+      "exp2-b2",
+      "proj1-b1",
+      "proj2-b1",
+      "exp1-b2",
+      "ach-b1",
+      "ach-b2"
+    ],
+    "rephrasings": [
+      {
+        "bullet_id": "proj1-b2",
+        "text": "Exposed the parser as a REST API, CLI and web visualiser"
+      }
+    ],
+    "skills_to_show": [
+      "Python",
+      "Django",
+      "PostgreSQL",
+      "Docker",
+      "GitHub Actions",
+      "Git",
+      "Node.js",
+      "React",
+      "JavaScript",
+      "Postman",
+      "TypeScript",
+      "MongoDB"
+    ],
+    "summary": null,
+    "jd_keywords": [
+      "REST APIs",
+      "Python",
+      "Django",
+      "PostgreSQL",
+      "Docker",
+      "SQL"
+    ]
+  }
+]

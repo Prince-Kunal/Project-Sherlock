@@ -85,3 +85,15 @@ async def test_fake_mode_scores_whatever_jobs_the_match_prompt_contains() -> Non
     scores = await build_fake_llm_client().generate(request, list[ScoredJob])
     assert [s.job_ref for s in scores] == ["0123abcd", "fedc9876"]  # not the prompt's example ref
     assert all(40 <= s.fit_score <= 95 for s in scores)
+
+
+async def test_fake_mode_tailors_any_resume() -> None:
+    from app.services.registry import build_fake_llm_client
+    from app.services.resume.tailor import Tailor
+    from tests.tailor_fixtures import master
+    from tests.test_tailor import _job
+
+    job, company = _job()
+    result = await Tailor(build_fake_llm_client()).tailor(master(), job, company, None)
+    assert result.ats.passed
+    assert {c.change for c in result.diff} <= {"rephrased"}  # only JD respellings

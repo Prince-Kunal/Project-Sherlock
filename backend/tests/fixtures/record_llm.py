@@ -4,6 +4,7 @@ Run from backend/ with a real GEMINI_API_KEY in .env (one fast-model request per
     uv run python -m tests.fixtures.record_llm            # resumes (parse_resume)
     uv run python -m tests.fixtures.record_llm hn         # HN thread fixture (parse_hn_comment)
     uv run python -m tests.fixtures.record_llm match      # matching fixture jobs (match)
+    uv run python -m tests.fixtures.record_llm tailor     # Rohan's resume for the Ledgerline intern job (smart)
 
 Re-run whenever the corresponding prompt changes version.
 """
@@ -72,6 +73,42 @@ async def record_match() -> None:
     print(f"recorded {out.relative_to(FIXTURES)} ({len(scores)} of {len(jobs)} jobs scored)")
 
 
+async def record_tailor() -> None:
+    """Records every attempt (the validator may reject the first) so tests replay the real sequence."""
+    from app.schemas.tailor import TailorPlan
+    from app.services.resume.skills import get_lexicon
+    from app.services.resume.tailor import Tailor
+    from app.services.resume.validator import validate_plan
+    from tests.matching_fixtures import fixture_jobs, fixture_resume, unsaved_job
+
+    class Recording(GeminiClient):
+        plans: list[TailorPlan] = []  # noqa: RUF012
+
+        async def generate(self, request, output_type, **kwargs):  # type: ignore[no-untyped-def]
+            plan = await super().generate(request, output_type, **kwargs)
+            self.plans.append(plan)
+            return plan
+
+    settings = get_settings()
+    client = Recording(
+        default_api_key=settings.gemini_api_key,
+        model_smart=settings.llm_model_smart,
+        model_fast=settings.llm_model_fast,
+        limiter=RateLimiter(get_redis(), rpm=settings.llm_rpm, rpd=settings.llm_rpd),
+    )
+    job, company = unsaved_job(next(i for i in fixture_jobs() if i["key"] == "relevant"))
+    resume = fixture_resume()
+    try:
+        await Tailor(client).plan(resume, job, company, None)
+    finally:
+        out = FIXTURES / "llm" / "tailor" / "rohan_ledgerline.json"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps([p.model_dump() for p in client.plans], indent=2) + "\n")
+        for i, plan in enumerate(client.plans, 1):
+            print(f"attempt {i}: issues={[x.code for x in validate_plan(plan, resume, get_lexicon())]}")
+        print(f"recorded {out.relative_to(FIXTURES)} ({len(client.plans)} attempts)")
+
+
 async def main() -> None:
     settings = get_settings()
     client = _client()
@@ -89,5 +126,5 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    modes = {"hn": record_hn, "match": record_match}
+    modes = {"hn": record_hn, "match": record_match, "tailor": record_tailor}
     asyncio.run(modes[sys.argv[1]]() if sys.argv[1:] else main())

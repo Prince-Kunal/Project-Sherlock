@@ -8,6 +8,7 @@ import asyncio
 import re
 import tempfile
 import unicodedata
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -115,7 +116,7 @@ def _bullet_texts(bullets: list[Bullet]) -> list[str]:
     return [t for t in (clean_text(b.text) for b in bullets) if t]
 
 
-def build_context(resume: MasterResume, section_order: list[str] | None = None) -> dict[str, Any]:
+def build_context(resume: MasterResume, section_order: Sequence[str] | None = None) -> dict[str, Any]:
     basics = resume.basics
     contact: list[dict[str, str | None]] = []
     if basics.email:
@@ -203,7 +204,7 @@ def _environment() -> Environment:
 _ENV = _environment()
 
 
-def render_typst_source(resume: MasterResume, section_order: list[str] | None = None) -> str:
+def render_typst_source(resume: MasterResume, section_order: Sequence[str] | None = None) -> str:
     return _ENV.get_template("resume.typ.j2").render(**build_context(resume, section_order))
 
 
@@ -237,7 +238,7 @@ async def compile_typst(source: str) -> bytes:
         return out.read_bytes()
 
 
-async def render_resume(resume: MasterResume, section_order: list[str] | None = None) -> RenderedResume:
+async def render_resume(resume: MasterResume, section_order: Sequence[str] | None = None) -> RenderedResume:
     context = build_context(resume, section_order)
     source = _ENV.get_template("resume.typ.j2").render(**context)
     pdf = await compile_typst(source)

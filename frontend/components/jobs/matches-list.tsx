@@ -12,6 +12,7 @@ import {
 import Link from "next/link";
 import { useState } from "react";
 
+import { TailorPreviewButton } from "@/components/jobs/tailor-preview";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -392,6 +393,9 @@ function MatchRow({ match }: { match: Match }) {
             Why this score
           </button>
           {open && <p className="mt-1 text-sm">{match.reasoning}</p>}
+          {editable && match.fit_score !== null && (
+            <TailorPreviewButton matchId={match.id} />
+          )}
           {(action.isError || block.isError) && (
             <p className="text-destructive mt-1 text-sm">
               {errorMessage(action.error ?? block.error)}

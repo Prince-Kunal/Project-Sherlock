@@ -174,5 +174,78 @@ async def test_match_routes_require_auth(client: AsyncClient) -> None:
         ("GET", "/companies/blocked"),
         ("POST", f"/companies/{some_id}/block"),
         ("DELETE", f"/companies/{some_id}/block"),
+        ("POST", f"/matches/{some_id}/tailor-preview"),
+        ("GET", f"/matches/{some_id}/tailored.pdf"),
     ]:
         assert (await client.request(method, path)).status_code == 401, path
+
+
+# --- Tailored resume preview (Phase 4) -------------------------------------------------------------
+
+
+async def test_tailor_preview_renders_and_serves_the_pdf(
+    auth_client: AsyncClient,
+    session: AsyncSession,
+    fake_llm: FakeLLMClient,
+    scored: dict[str, uuid.UUID],
+    other_user_headers: dict[str, str],
+) -> None:
+    from sqlalchemy import select
+
+    from app.models import UsageLedger
+
+    fake_llm.add_response("tailor", recorded("tailor", "rohan_ledgerline"))
+    [item] = (await auth_client.get("/matches")).json()["items"]
+
+    response = await auth_client.post(f"/matches/{item['id']}/tailor-preview")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["ats"]["passed"] is True
+    assert body["ats"]["page_count"] == 1
+    assert body["filename"] == "Rohan_Das_Resume.pdf"
+    assert "PostgreSQL" in body["keyword_coverage"]["matched"]
+    assert body["pdf_url"] == f"/matches/{item['id']}/tailored.pdf"
+
+    pdf = await auth_client.get(body["pdf_url"])
+    assert pdf.status_code == 200
+    assert pdf.headers["content-type"] == "application/pdf"
+    assert pdf.headers["content-disposition"].startswith("inline")
+    assert 'filename="Rohan_Das_Resume.pdf"' in pdf.headers["content-disposition"]
+    assert pdf.content.startswith(b"%PDF")
+
+    ledger = (
+        await session.scalars(select(UsageLedger).where(UsageLedger.operation == "tailor_resume"))
+    ).all()
+    assert [row.units for row in ledger] == [len(recorded("tailor", "rohan_ledgerline"))]  # type: ignore[arg-type]
+
+    # Someone else can neither generate nor fetch it (invariant 5).
+    assert (
+        await auth_client.post(f"/matches/{item['id']}/tailor-preview", headers=other_user_headers)
+    ).status_code == 404
+    assert (await auth_client.get(body["pdf_url"], headers=other_user_headers)).status_code == 404
+
+
+async def test_tailor_preview_reports_a_rejected_plan(
+    auth_client: AsyncClient, fake_llm: FakeLLMClient, scored: dict[str, uuid.UUID]
+) -> None:
+    plan = recorded("tailor", "rohan_ledgerline")[0]  # type: ignore[index]
+    bad = {**plan, "rephrasings": [{"bullet_id": "exp1-b1", "text": "Ran it all on Kubernetes"}]}
+    fake_llm.add_response("tailor", bad)
+    [item] = (await auth_client.get("/matches")).json()["items"]
+    response = await auth_client.post(f"/matches/{item['id']}/tailor-preview")
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "tailor_validation_failed"
+    assert "Kubernetes" in response.json()["detail"]["message"]
+    assert (await auth_client.get(f"/matches/{item['id']}/tailored.pdf")).status_code == 404
+
+
+async def test_tailor_preview_needs_a_key(auth_client: AsyncClient, session: AsyncSession) -> None:
+    from app.models import UserLLMKey
+
+    ids = await scored_user(session, await _me(auth_client))
+    assert ids
+    await session.execute(UserLLMKey.__table__.delete())
+    await session.commit()
+    [item] = (await auth_client.get("/matches")).json()["items"]
+    response = await auth_client.post(f"/matches/{item['id']}/tailor-preview")
+    assert response.status_code == 428

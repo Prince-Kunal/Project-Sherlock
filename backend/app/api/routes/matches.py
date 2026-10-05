@@ -5,11 +5,12 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.errors import api_error
+from app.api.errors import api_error, llm_errors
 from app.core.auth import CurrentUser
 from app.core.config import get_settings
 from app.core.db import get_session
@@ -17,10 +18,17 @@ from app.models import Company, Job, JobMatch
 from app.models.enums import JobMatchStatus
 from app.schemas.jobs import JobOut
 from app.schemas.matches import MatchFeed, MatchOut, MatchStatusFilter, ScoringStatus
-from app.services.llm.user_keys import get_key_row
+from app.schemas.resume import MasterResume
+from app.schemas.tailor import TailorPreviewOut
+from app.services.llm.client import LLMClient
+from app.services.llm.user_keys import get_key_row, resolve_api_key
 from app.services.matching.filters import hard_filter_conditions
 from app.services.matching.pipeline import OPERATION, daily_window_start, load_preferences
-from app.services.usage import llm_calls_since
+from app.services.registry import get_llm_client
+from app.services.resume import store
+from app.services.resume.files import find_pdf, preview_folder, save_tailored_pdf
+from app.services.resume.tailor import Tailor, TailorError
+from app.services.usage import llm_calls_since, logged_llm_usage
 from app.workers.queue import enqueue
 
 router = APIRouter(prefix="/matches", tags=["matches"])
@@ -132,9 +140,9 @@ async def refresh_matches(user: CurrentUser) -> RefreshQueued:
     return RefreshQueued(queued=job_id is not None)
 
 
-async def _set_status(
-    session: AsyncSession, user_id: uuid.UUID, match_id: uuid.UUID, action: str
-) -> MatchOut:
+async def _owned(
+    session: AsyncSession, user_id: uuid.UUID, match_id: uuid.UUID
+) -> tuple[JobMatch, Job, Company]:
     row = (
         await session.execute(
             select(JobMatch, Job, Company)
@@ -146,6 +154,13 @@ async def _set_status(
     if row is None:
         raise api_error(status.HTTP_404_NOT_FOUND, "match_not_found", "Match not found.")
     match, job, company = row
+    return match, job, company
+
+
+async def _set_status(
+    session: AsyncSession, user_id: uuid.UUID, match_id: uuid.UUID, action: str
+) -> MatchOut:
+    match, job, company = await _owned(session, user_id, match_id)
     target, allowed_from = _ACTIONS[action]
     if match.status != target:
         if match.status not in allowed_from:
@@ -174,3 +189,62 @@ async def hide(match_id: uuid.UUID, user: CurrentUser, session: Session) -> Matc
 async def restore(match_id: uuid.UUID, user: CurrentUser, session: Session) -> MatchOut:
     """Undo shortlist/hide: back to new."""
     return await _set_status(session, user.id, match_id, "restore")
+
+
+# --- Tailored resume preview (PLAN.md Phase 4; the full draft pipeline arrives in Phase 6) ---------
+
+
+@router.post("/{match_id}/tailor-preview", response_model=TailorPreviewOut)
+async def tailor_preview(
+    match_id: uuid.UUID,
+    user: CurrentUser,
+    session: Session,
+    llm: Annotated[LLMClient, Depends(get_llm_client)],
+) -> TailorPreviewOut:
+    """Tailor the current resume to this match's job: one smart-model request (two if the first plan
+    is rejected by the validator), then a 1-page, ATS-checked PDF."""
+    match, job, company = await _owned(session, user.id, match_id)
+    resume_row = await store.get_current(session, user.id)
+    if resume_row is None:
+        raise api_error(status.HTTP_409_CONFLICT, "no_resume", "Upload your resume first.")
+    master = MasterResume.model_validate(resume_row.data)
+
+    with llm_errors():
+        api_key = await resolve_api_key(session, user.id)
+        try:
+            async with logged_llm_usage(session, user.id, "tailor_resume"):
+                result = await Tailor(llm).tailor(master, job, company, api_key)
+        except TailorError as exc:
+            details = "; ".join(i.message for i in exc.issues[:3]) or str(exc)
+            raise api_error(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                f"tailor_{exc.reason}",
+                f"Couldn't tailor the resume for this job ({exc.reason.replace('_', ' ')}): {details}",
+            ) from exc
+
+    await save_tailored_pdf(user.id, preview_folder(match.id), result.filename, result.rendered.pdf)
+    return TailorPreviewOut(
+        match_id=str(match.id),
+        pdf_url=f"/matches/{match.id}/tailored.pdf",
+        filename=result.filename,
+        section_order=result.section_order,
+        diff=result.diff,
+        keyword_coverage=result.keyword_coverage,
+        ats=result.ats,
+        bullets_dropped_to_fit=len(result.dropped_to_fit),
+    )
+
+
+@router.get("/{match_id}/tailored.pdf", response_class=FileResponse)
+async def tailored_pdf(match_id: uuid.UUID, user: CurrentUser, session: Session) -> FileResponse:
+    match, _, _ = await _owned(session, user.id, match_id)
+    path = find_pdf(user.id, preview_folder(match.id))
+    if path is None:
+        raise api_error(status.HTTP_404_NOT_FOUND, "no_preview", "Generate a preview first.")
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        filename=path.name,
+        content_disposition_type="inline",
+        headers={"Cache-Control": "no-store"},
+    )

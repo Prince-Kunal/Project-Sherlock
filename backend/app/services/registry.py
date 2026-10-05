@@ -50,12 +50,33 @@ def _fake_match_scores(prompt: str) -> list[dict[str, Any]]:
     ]
 
 
+_RESUME_BLOCK_RE = re.compile(r"## Resume\n```json\n(.*?)\n```", re.DOTALL)
+
+
+def _fake_tailor_plan(prompt: str) -> dict[str, Any]:
+    """USE_FAKES answer for prompts/tailor.md: keep every bullet as written, in resume order."""
+    match = _RESUME_BLOCK_RE.search(prompt)
+    resume: dict[str, Any] = json.loads(match.group(1)) if match else {}
+    entries = [*resume.get("education", []), *resume.get("experience", []), *resume.get("projects", [])]
+    ids = [b["id"] for e in entries for b in e.get("bullets", [])]
+    ids += [b["id"] for b in resume.get("achievements", [])]
+    return {
+        "section_order": ["education", "experience", "projects", "skills", "achievements"],
+        "selected_bullet_ids": ids,
+        "rephrasings": [],
+        "skills_to_show": [s for items in resume.get("skills", {}).values() for s in items],
+        "summary": None,
+        "jd_keywords": [],
+    }
+
+
 def build_fake_llm_client() -> FakeLLMClient:
     """For USE_FAKES=true local runs: canned answers so the UI works without an API key."""
     client = FakeLLMClient()
     for path in sorted(_FAKE_RESPONSES.glob("*.json")):
         client.add_response(path.stem, json.loads(path.read_text()))
     client.add_responder("match", _fake_match_scores)
+    client.add_responder("tailor", _fake_tailor_plan)
     return client
 
 

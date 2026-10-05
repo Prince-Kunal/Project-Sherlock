@@ -169,3 +169,21 @@ export type MatchFilters = {
   limit: number;
   offset: number;
 };
+
+export type ResumeChange = {
+  bullet_id: string;
+  change: "added" | "removed" | "reordered" | "rephrased";
+  before: string | null;
+  after: string | null;
+};
+
+export type TailorPreview = {
+  match_id: string;
+  pdf_url: string;
+  filename: string;
+  section_order: string[];
+  diff: ResumeChange[];
+  keyword_coverage: NonNullable<AtsReport["keyword_coverage"]>;
+  ats: AtsReport;
+  bullets_dropped_to_fit: number;
+};
