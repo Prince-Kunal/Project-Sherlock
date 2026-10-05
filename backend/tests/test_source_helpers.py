@@ -7,9 +7,17 @@ from app.services.sources.text import (
     dedupe_hash,
     detect_employment_type,
     detect_remote,
+    fix_mojibake,
     html_to_text,
     normalize_key,
 )
+
+
+def test_fix_mojibake_repairs_utf8_read_as_latin1_only() -> None:
+    assert fix_mojibake("Engineer \u00e2\x80\x93 Intern") == "Engineer – Intern"
+    assert fix_mojibake("Caf\u00c3\u00a9 \u00e2\u20ac\u201c Bar") == "Café – Bar"  # CP1252 variant
+    for fine in ("Procter & Gamble", "Zürich – Remote", "Ångström", ""):
+        assert fix_mojibake(fine) == fine
 
 
 def test_html_to_text_strips_tags_keeps_structure_and_caps() -> None:

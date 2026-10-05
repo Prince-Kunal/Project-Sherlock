@@ -203,7 +203,7 @@ def test_ashby_missing_fields_and_secondary_locations() -> None:
 @respx.mock
 async def test_adzuna_fetch_and_normalize(http: PoliteHttpClient) -> None:
     route = respx.get("https://api.adzuna.com/v1/api/jobs/in/search/1").mock(
-        return_value=httpx.Response(200, json=load("adzuna/search_unverified.json"))
+        return_value=httpx.Response(200, json=load("adzuna/search_in.json"))
     )
     source = AdzunaSource(http, "app-id", "app-key")
     raws = await source.fetch(JobQuery(what="backend intern"))
@@ -212,12 +212,17 @@ async def test_adzuna_fetch_and_normalize(http: PoliteHttpClient) -> None:
     assert params["max_days_old"] == "14"
     assert params["app_id"] == "app-id"
     jobs = [source.normalize(r) for r in raws]
-    assert jobs[0].title == "Backend Engineer Intern"  # <strong> stripped
-    assert jobs[0].company_name == "Example Fintech Pvt Ltd"
-    assert jobs[0].employment_type == "internship"
-    assert jobs[0].posted_at == datetime(2026, 10, 3, 9, 15, tzinfo=UTC)
+    assert len(jobs) == 4
+    assert jobs[0].title == "Software Development Engineer – Intern / Fresher"  # mojibake repaired
+    assert jobs[0].company_name == "Mellow Vault"
+    assert jobs[0].location == "Noida, Ghaziabad"
+    assert jobs[0].employment_type == "internship"  # title beats contract_time=full_time
+    assert jobs[0].posted_at == datetime(2026, 10, 4, 16, 36, 40, tzinfo=UTC)
     assert jobs[0].company_domain is None  # unknown until Phase 5
-    assert jobs[1].employment_type == "contract"  # contract_type
+    assert (jobs[0].url or "").startswith("https://www.adzuna.in/details/")
+    assert jobs[1].employment_type == "full_time"  # contract_time
+    assert jobs[3].employment_type == "internship"
+    assert jobs[3].company_name == "Procter & Gamble"
 
 
 async def test_adzuna_requires_keys(http: PoliteHttpClient) -> None:
@@ -229,7 +234,7 @@ async def test_adzuna_requires_keys(http: PoliteHttpClient) -> None:
 
 def test_adzuna_result_without_company_is_skipped() -> None:
     source = AdzunaSource(http=None, app_id="a", app_key="b")  # type: ignore[arg-type]
-    result = load("adzuna/search_unverified.json")["results"][0]
+    result = load("adzuna/search_in.json")["results"][0]
     with pytest.raises(MalformedJobError):
         source.normalize(
             RawJob(source=JobSourceType.ADZUNA, external_id="1", payload=result, company_name=None)

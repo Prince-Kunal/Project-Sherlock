@@ -1,7 +1,7 @@
 """Adzuna (India): GET api.adzuna.com/v1/api/jobs/in/search/{page}?app_id&app_key&what&max_days_old.
 
 Queries come from users' target roles. Companies are created on the fly by name (domain unknown
-until Phase 5). Adzuna returns only a description snippet.
+until Phase 5). Adzuna returns only a description snippet, and some titles arrive as mojibake.
 """
 
 import re
@@ -11,7 +11,7 @@ from app.models.enums import JobSourceType
 from app.services.sources.base import CompanyRef, JobIn, JobQuery, JobSource, MalformedJobError, RawJob
 from app.services.sources.greenhouse import parse_datetime
 from app.services.sources.http import PoliteHttpClient
-from app.services.sources.text import detect_employment_type, detect_remote, html_to_text
+from app.services.sources.text import detect_employment_type, detect_remote, fix_mojibake, html_to_text
 
 BASE_URL = "https://api.adzuna.com/v1/api/jobs/in/search"
 RESULTS_PER_PAGE = 50
@@ -59,7 +59,9 @@ class AdzunaSource(JobSource):
                     source=self.source,
                     external_id=str(r["id"]) if r.get("id") is not None else None,
                     payload=r,
-                    company_name=(r.get("company") or {}).get("display_name"),
+                    company_name=fix_mojibake(name)
+                    if (name := (r.get("company") or {}).get("display_name"))
+                    else None,
                 )
                 for r in results
                 if isinstance(r, dict)
@@ -70,13 +72,13 @@ class AdzunaSource(JobSource):
 
     def normalize(self, raw: RawJob) -> JobIn:
         job = raw.payload
-        title = html_to_text(str(job.get("title") or ""))
+        title = fix_mojibake(html_to_text(str(job.get("title") or "")))
         if not title:
             raise MalformedJobError("Adzuna result without a title")
         if not raw.company_name:
             raise MalformedJobError("Adzuna result without a company")
         location = (job.get("location") or {}).get("display_name")
-        description = html_to_text(job.get("description"))
+        description = fix_mojibake(html_to_text(job.get("description")))
         hint = job.get("contract_time") or job.get("contract_type")
         return JobIn(
             source=self.source,

@@ -16,6 +16,23 @@ _INLINE_TAG_RE = re.compile(r"<\s*/?\s*(b|strong|i|em|u|span|a|code|small|sup|su
 _LIST_ITEM_RE = re.compile(r"<\s*li\b[^>]*>", re.I)
 _DROP_RE = re.compile(r"<\s*(script|style|noscript)\b.*?<\s*/\s*\1\s*>", re.I | re.S)
 _TAG_RE = re.compile(r"<[^>]+>")
+# UTF-8 bytes that were decoded as Latin-1 or CP1252 upstream: an en dash arrives as "\u00e2\x80\x93"
+# (Latin-1) or "\u00e2\u20ac\u201c" (CP1252). A lead byte (\u00c2, \u00c3, \u00e2) followed by a
+# continuation byte in either decoding marks it.
+_CONTINUATION = "\x80-\xbf" + re.escape(bytes(range(0x80, 0xA0)).decode("cp1252", errors="ignore"))
+_MOJIBAKE_RE = re.compile(f"[\u00c2\u00c3\u00e2][{_CONTINUATION}]")
+
+
+def fix_mojibake(text: str) -> str:
+    """Undo one round of UTF-8-read-as-Latin-1 (Adzuna titles do this). Unchanged if it doesn't apply."""
+    if not _MOJIBAKE_RE.search(text):
+        return text
+    for codec in ("latin-1", "cp1252"):
+        try:
+            return text.encode(codec).decode("utf-8")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            continue
+    return text
 
 
 def html_to_text(raw: str | None, limit: int = MAX_DESCRIPTION_CHARS) -> str:

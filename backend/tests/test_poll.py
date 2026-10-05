@@ -78,7 +78,7 @@ async def _count_jobs(session: AsyncSession) -> int:
 @respx.mock
 async def test_polling_twice_creates_no_duplicates(seed: Path, session: AsyncSession) -> None:
     _mock_boards()
-    respx.get(ADZUNA_URL).mock(return_value=httpx.Response(200, json=load("adzuna/search_unverified.json")))
+    respx.get(ADZUNA_URL).mock(return_value=httpx.Response(200, json=load("adzuna/search_in.json")))
     sessions = get_sessionmaker()
 
     # A user with a target role makes an Adzuna query.
@@ -92,15 +92,16 @@ async def test_polling_twice_creates_no_duplicates(seed: Path, session: AsyncSes
 
     first = await run_poll(sessions, _sources(adzuna=True), seed_path=seed)
     assert first.failed == 0, first.errors
-    assert first.jobs_created == 3 + 3 + 3 + 2
-    assert await _count_jobs(session) == 11
+    # Adzuna: 4 results, two of them the same JPMorganChase title + location → 3 jobs.
+    assert first.jobs_created == 3 + 3 + 3 + 3
+    assert await _count_jobs(session) == 12
 
     second = await run_poll(sessions, _sources(adzuna=True), seed_path=seed)
     assert second.jobs_created == 0
-    assert second.jobs_updated == 11
-    assert await _count_jobs(session) == 11
+    assert second.jobs_updated == 12
+    assert await _count_jobs(session) == 12
     assert (
-        await session.scalar(select(func.count()).select_from(Company)) == 3 + 2
+        await session.scalar(select(func.count()).select_from(Company)) == 3 + 3
     )  # Adzuna companies by name
 
     # Board polls are recorded on the company.

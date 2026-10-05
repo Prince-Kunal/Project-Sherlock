@@ -1,0 +1,126 @@
+{
+  "__CLASS__": "Adzuna::API::Response::JobSearchResults",
+  "mean": 187750,
+  "count": 21,
+  "results": [
+    {
+      "contract_type": "contract",
+      "longitude": 77.3225,
+      "location": {
+        "display_name": "Noida, Ghaziabad",
+        "__CLASS__": "Adzuna::API::Response::Location",
+        "area": [
+          "India",
+          "Uttar Pradesh",
+          "Ghaziabad",
+          "Noida"
+        ]
+      },
+      "created": "2026-10-04T16:36:40Z",
+      "company": {
+        "__CLASS__": "Adzuna::API::Response::Company",
+        "display_name": "Mellow Vault"
+      },
+      "latitude": 28.56579,
+      "category": {
+        "tag": "it-jobs",
+        "__CLASS__": "Adzuna::API::Response::Category",
+        "label": "IT Jobs"
+      },
+      "id": "5911415098",
+      "title": "Software Development Engineer â Intern / Fresher",
+      "__CLASS__": "Adzuna::API::Response::Job",
+      "salary_is_predicted": "0",
+      "salary_max": 500000,
+      "contract_time": "full_time",
+      "description": "About the Role We are looking for an ambitious Software Engineering Intern to join our engineering team. You will write production-ready code, collaborate directly with senior engineers, and build features used by real users from day one. High performers will be considered for a full-time Pre-Placement Offer (PPO) at the end of the internship. Key Responsibilities Build and maintain clean, scalable frontend or backend features under senior mentorship. Write modular, testable code and assist in …",
+      "salary_min": 200000,
+      "redirect_url": "https://www.adzuna.in/details/5911415098?utm_medium=api&utm_source=APP_ID"
+    },
+    {
+      "category": {
+        "tag": "it-jobs",
+        "label": "IT Jobs",
+        "__CLASS__": "Adzuna::API::Response::Category"
+      },
+      "salary_is_predicted": "0",
+      "__CLASS__": "Adzuna::API::Response::Job",
+      "title": "Software Engineer II - Java, Springboot, React",
+      "redirect_url": "https://www.adzuna.in/details/5908408506?utm_medium=api&utm_source=APP_ID",
+      "id": "5908408506",
+      "contract_time": "full_time",
+      "description": "Description Job responsibilities Design, develop, test, and maintain software components for web applications and backend services. Build frontend features using React, JavaScript / TypeScript, HTML5, CSS3, and component-based user interface patterns. Develop and support Java / Spring Boot microservices, REST APIs, GraphQL, and backend application components. Write secure, high-quality, maintainable code with guidance from senior engineers. Participate in technical troubleshooting to identify, …",
+      "company": {
+        "display_name": "JPMorganChase",
+        "__CLASS__": "Adzuna::API::Response::Company"
+      },
+      "created": "2026-10-02T21:50:14Z",
+      "location": {
+        "area": [
+          "India",
+          "Karnataka",
+          "Bangalore"
+        ],
+        "__CLASS__": "Adzuna::API::Response::Location",
+        "display_name": "Bangalore, Karnataka"
+      }
+    },
+    {
+      "location": {
+        "display_name": "Bangalore, Karnataka",
+        "__CLASS__": "Adzuna::API::Response::Location",
+        "area": [
+          "India",
+          "Karnataka",
+          "Bangalore"
+        ]
+      },
+      "company": {
+        "display_name": "JPMorganChase",
+        "__CLASS__": "Adzuna::API::Response::Company"
+      },
+      "created": "2026-10-02T21:29:58Z",
+      "contract_time": "full_time",
+      "description": "Description Job responsibilities Design, develop, test, and maintain software components for web applications and backend services. Build frontend features using React, JavaScript / TypeScript, HTML5, CSS3, and component-based user interface patterns. Develop and support Java / Spring Boot microservices, REST APIs, GraphQL, and backend application components. Write secure, high-quality, maintainable code with guidance from senior engineers. Participate in technical troubleshooting to identify, …",
+      "id": "5908337589",
+      "salary_is_predicted": "0",
+      "__CLASS__": "Adzuna::API::Response::Job",
+      "title": "Software Engineer II - Java, Springboot, React",
+      "redirect_url": "https://www.adzuna.in/details/5908337589?utm_medium=api&utm_source=APP_ID",
+      "category": {
+        "__CLASS__": "Adzuna::API::Response::Category",
+        "label": "IT Jobs",
+        "tag": "it-jobs"
+      }
+    },
+    {
+      "longitude": 72.84415,
+      "description": "MUMBAI GENERAL OFFICE Full time R000160029 Job Location MUMBAI GENERAL OFFICE Job Description This is a 6-month internship program. During this period, you may be aligned to one of the roles outlined below, based on business requirements, your skills, and overall fit. We encourage you to go through each role to understand the scope of work and expectations. Information Technology Intern (Software Engineering) Overview At Procter & Gamble, IT is at the core of how we innovate, make decisions, an…",
+      "location": {
+        "display_name": "Mumbai, Maharashtra",
+        "__CLASS__": "Adzuna::API::Response::Location",
+        "area": [
+          "India",
+          "Maharashtra",
+          "Mumbai"
+        ]
+      },
+      "created": "2026-10-02T11:18:03Z",
+      "company": {
+        "display_name": "Procter & Gamble",
+        "__CLASS__": "Adzuna::API::Response::Company"
+      },
+      "latitude": 19.00821,
+      "category": {
+        "__CLASS__": "Adzuna::API::Response::Category",
+        "label": "IT Jobs",
+        "tag": "it-jobs"
+      },
+      "id": "5907469680",
+      "__CLASS__": "Adzuna::API::Response::Job",
+      "title": "Information Technology Intern",
+      "redirect_url": "https://www.adzuna.in/details/5907469680?utm_medium=api&utm_source=APP_ID",
+      "salary_is_predicted": "0"
+    }
+  ]
+}

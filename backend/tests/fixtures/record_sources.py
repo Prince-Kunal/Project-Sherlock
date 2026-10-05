@@ -5,6 +5,9 @@ Adapters are coded against these fixtures (PLAN.md Phase 2): re-record when an A
 """
 
 import json
+import os
+import re
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -64,5 +67,31 @@ def main() -> None:
     save("hn/thread.json", item)
 
 
+def record_adzuna() -> None:
+    """Needs ADZUNA_APP_ID/ADZUNA_APP_KEY in the environment. The app id is scrubbed from the fixture."""
+    app_id, app_key = os.environ["ADZUNA_APP_ID"], os.environ["ADZUNA_APP_KEY"]
+    data = httpx.get(
+        "https://api.adzuna.com/v1/api/jobs/in/search/1",
+        params={
+            "app_id": app_id,
+            "app_key": app_key,
+            "results_per_page": 4,
+            "what": "software engineer intern",
+            "max_days_old": 14,
+            "sort_by": "date",
+            "content-type": "application/json",
+        },
+        headers=HEADERS,
+        timeout=30,
+    ).json()
+    for r in data["results"]:
+        r.pop("adref", None)
+        r["redirect_url"] = re.sub(r"utm_source=[^&]+", "utm_source=APP_ID", r["redirect_url"])
+    text = json.dumps(data)
+    if app_id in text or app_key in text:
+        raise SystemExit("Adzuna credentials leaked into the fixture; not saving")
+    save("adzuna/search_in.json", data)
+
+
 if __name__ == "__main__":
-    main()
+    record_adzuna() if sys.argv[1:] == ["adzuna"] else main()
