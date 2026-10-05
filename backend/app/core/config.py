@@ -32,8 +32,8 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     llm_model_smart: str = "gemini-3.8-flash"
     llm_model_fast: str = "gemini-3.5-flash-lite"
-    llm_rpm: int = 8
-    llm_rpd: int = 200
+    llm_rpm: int = 4
+    llm_rpd: int = 18
     llm_cache_ttl_seconds: int = 7 * 24 * 3600
     allow_owner_key_fallback: bool = False
 

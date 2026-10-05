@@ -191,10 +191,14 @@ async def test_gemini_daily_quota_raises_and_blocks_further_calls() -> None:
     client = _gemini(redis, _NoSleep())
     with pytest.raises(LLMQuotaExhaustedError):
         await client.generate(_request(), Score)
-    # Subsequent calls fail fast without hitting the API.
+    # Subsequent calls to that model fail fast without hitting the API...
     with pytest.raises(LLMQuotaExhaustedError):
         await client.generate(_request(prompt="another"), Score)
     assert respx.calls.call_count == 1
+    # ...but the other model's quota is separate.
+    respx.post(url__regex=GEMINI_URL).mock(return_value=_ok({"fit_score": 5, "reasoning": "r"}))
+    result = await client.generate(_request(tier="smart", prompt="third"), Score)
+    assert result.fit_score == 5
 
 
 @respx.mock
@@ -211,6 +215,19 @@ async def test_smart_model_falls_back_to_fast_once_when_allowed() -> None:
 
     with pytest.raises(LLMRateLimitedError):
         await client.generate(_request(tier="smart", allow_fallback=False, prompt="other"), Score)
+
+
+@respx.mock
+async def test_smart_model_falls_back_to_fast_when_daily_quota_exhausted() -> None:
+    def respond(request: httpx.Request, model: str) -> httpx.Response:
+        if model == "smart-model":
+            return _rate_limited(PER_DAY)
+        return _ok({"fit_score": 44, "reasoning": "fast"})
+
+    respx.post(url__regex=GEMINI_URL).mock(side_effect=respond)
+    client = _gemini(FakeAsyncRedis(decode_responses=True), _NoSleep())
+    result = await client.generate(_request(tier="smart", allow_fallback=True), Score)
+    assert result.fit_score == 44
 
 
 @respx.mock
@@ -243,36 +260,44 @@ async def test_token_bucket_waits_when_rpm_exhausted() -> None:
 
     sleeps: list[float] = []
     limiter = RateLimiter(FakeAsyncRedis(decode_responses=True), rpm=2, rpd=100, clock=clock, sleep=sleep)
-    await limiter.acquire("k")
-    await limiter.acquire("k")
+    await limiter.acquire("k", "m")
+    await limiter.acquire("k", "m")
     assert sleeps == []
-    await limiter.acquire("k")  # bucket empty: must wait ~30s for one token at 2/min
+    await limiter.acquire("k", "m")  # bucket empty: must wait ~30s for one token at 2/min
     assert 29 <= sum(sleeps) <= 31
 
 
 async def test_rate_limits_are_per_key() -> None:
     clock = _Clock()
     limiter = RateLimiter(FakeAsyncRedis(decode_responses=True), rpm=1, rpd=1, clock=clock)
-    await limiter.acquire("user-a")
-    await limiter.acquire("user-b")
+    await limiter.acquire("user-a", "m")
+    await limiter.acquire("user-b", "m")
     with pytest.raises(LLMQuotaExhaustedError):
-        await limiter.acquire("user-a")
+        await limiter.acquire("user-a", "m")
+
+
+async def test_each_model_has_its_own_budget() -> None:
+    limiter = RateLimiter(FakeAsyncRedis(decode_responses=True), rpm=100, rpd=1, clock=_Clock())
+    await limiter.acquire("k", "smart-model")
+    await limiter.acquire("k", "fast-model")
+    with pytest.raises(LLMQuotaExhaustedError):
+        await limiter.acquire("k", "smart-model")
 
 
 async def test_daily_limit_resets_on_next_pacific_day() -> None:
     clock = _Clock()
     limiter = RateLimiter(FakeAsyncRedis(decode_responses=True), rpm=100, rpd=1, clock=clock)
-    await limiter.acquire("k")
+    await limiter.acquire("k", "m")
     with pytest.raises(LLMQuotaExhaustedError):
-        await limiter.acquire("k")
+        await limiter.acquire("k", "m")
     clock.now += 24 * 3600
-    await limiter.acquire("k")
+    await limiter.acquire("k", "m")
 
 
 async def test_raw_api_key_never_stored_in_redis() -> None:
     redis = FakeAsyncRedis(decode_responses=True)
     limiter = RateLimiter(redis, rpm=10, rpd=10)
-    await limiter.acquire("AIzaSecretKey123")
+    await limiter.acquire("AIzaSecretKey123", "m")
     keys = [k async for k in redis.scan_iter()]
     assert keys
     assert not any("AIzaSecretKey123" in k for k in keys)

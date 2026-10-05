@@ -1,6 +1,7 @@
-"""Per-API-key rate limiting in Redis: a token bucket for requests/minute plus a daily counter.
+"""Rate limiting in Redis per (API key, model): a token bucket for requests/minute plus a daily counter.
 
-Gemini's free-tier daily quota resets at midnight US Pacific time, so the daily window uses that date.
+Gemini free-tier quotas apply per project *and* per model, so each model gets its own budget.
+The daily quota resets at midnight US Pacific time, so the daily window uses that date.
 Keys are identified by a hash; the raw API key never touches Redis.
 """
 
@@ -63,19 +64,19 @@ class RateLimiter:
         self._sleep = sleep
         self._bucket = redis.register_script(_BUCKET_LUA)
 
-    def _day_key(self, fingerprint: str) -> str:
+    def _day_key(self, fingerprint: str, model: str) -> str:
         day = datetime.fromtimestamp(self._clock(), _PACIFIC).date().isoformat()
-        return f"llm:rpd:{fingerprint}:{day}"
+        return f"llm:rpd:{fingerprint}:{model}:{day}"
 
-    async def acquire(self, api_key: str) -> None:
-        """Block until a request may be made with this key. Raises if the daily quota is used up."""
+    async def acquire(self, api_key: str, model: str) -> None:
+        """Block until a request to `model` may be made with this key. Raises if its daily quota is gone."""
         fingerprint = key_fingerprint(api_key)
-        day_key = self._day_key(fingerprint)
+        day_key = self._day_key(fingerprint, model)
         used = await self._redis.incr(day_key)
         if used == 1:
             await self._redis.expire(day_key, _DAY_TTL_SECONDS)
         if used > self._rpd:
-            raise LLMQuotaExhaustedError(f"daily request limit ({self._rpd}) reached for key {fingerprint}")
+            raise LLMQuotaExhaustedError(f"daily limit ({self._rpd}) reached for {model}, key {fingerprint}")
 
         waited = 0.0
         refill_per_ms = self._rpm / 60_000
@@ -83,17 +84,17 @@ class RateLimiter:
             now_ms = int(self._clock() * 1000)
             wait_ms = int(
                 await self._bucket(
-                    keys=[f"llm:rpm:{fingerprint}"], args=[self._rpm, refill_per_ms, now_ms, 120_000]
+                    keys=[f"llm:rpm:{fingerprint}:{model}"], args=[self._rpm, refill_per_ms, now_ms, 120_000]
                 )
             )
             if wait_ms == 0:
                 return
             if waited + wait_ms / 1000 > self._max_wait:
-                raise LLMRateLimitedError(f"per-minute limit for key {fingerprint}: would wait too long")
+                raise LLMRateLimitedError(f"{model} per-minute limit, key {fingerprint}: wait too long")
             await self._sleep(wait_ms / 1000)
             waited += wait_ms / 1000
 
-    async def mark_exhausted(self, api_key: str) -> None:
+    async def mark_exhausted(self, api_key: str, model: str) -> None:
         """The provider reported the daily quota is gone: make further acquires fail fast until reset."""
-        day_key = self._day_key(key_fingerprint(api_key))
+        day_key = self._day_key(key_fingerprint(api_key), model)
         await self._redis.set(day_key, self._rpd, ex=_DAY_TTL_SECONDS)

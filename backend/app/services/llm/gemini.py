@@ -62,9 +62,16 @@ class GeminiClient(LLMClient):
         model = self._models[request.tier]
         try:
             return await self._call_with_backoff(api_key, model, prompt, schema, request.prompt_name)
-        except LLMRateLimitedError:
+        except (LLMRateLimitedError, LLMQuotaExhaustedError) as exc:
+            # Free-tier smart quotas are small (~20/day), so tailoring/drafting may use the fast model
+            # instead; the deterministic validators guarantee quality either way (PLAN.md §3.1).
             if request.tier == "smart" and request.allow_fallback:
-                log.warning("llm %s: %s rate-limited, falling back to fast model", request.prompt_name, model)
+                log.warning(
+                    "llm %s: %s unavailable (%s), falling back to fast model",
+                    request.prompt_name,
+                    model,
+                    type(exc).__name__,
+                )
                 return await self._call_with_backoff(
                     api_key, self._models["fast"], prompt, schema, request.prompt_name
                 )
@@ -74,12 +81,12 @@ class GeminiClient(LLMClient):
         self, api_key: str, model: str, prompt: str, schema: dict[str, Any], prompt_name: str
     ) -> str:
         for attempt in range(self._max_retries + 1):
-            await self._limiter.acquire(api_key)
+            await self._limiter.acquire(api_key, model)
             try:
                 return await self._call(api_key, model, prompt, schema, prompt_name)
             except genai_errors.APIError as err:
                 if err.code == 429 and _is_daily_quota_error(err):
-                    await self._limiter.mark_exhausted(api_key)
+                    await self._limiter.mark_exhausted(api_key, model)
                     raise LLMQuotaExhaustedError(f"Gemini daily quota exhausted for {model}") from err
                 if err.code != 429 and err.code not in _RETRYABLE_SERVER_CODES:
                     raise
@@ -101,6 +108,7 @@ class GeminiClient(LLMClient):
                 response_mime_type="application/json",
                 response_json_schema=schema,
                 temperature=0.2,
+                automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
             ),
         )
         if not response.text:
