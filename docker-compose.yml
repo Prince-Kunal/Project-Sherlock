@@ -9,11 +9,13 @@ x-backend: &backend
     REDIS_URL: redis://redis:6379/0
     STORAGE_DIR: /data/files
     DATA_DIR: /repo-data
+    EMBED_CACHE_DIR: /models
   volumes:
     - ./backend:/app
     - /app/.venv
     - ./data:/repo-data:ro
     - files:/data/files
+    - models:/models
   depends_on:
     postgres:
       condition: service_healthy
@@ -83,3 +85,4 @@ services:
 volumes:
   pgdata:
   files:
+  models:

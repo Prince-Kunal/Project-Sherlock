@@ -4,6 +4,7 @@ posted_at uses `first_published` (the API added it; PLAN.md assumed no creation 
 2026-10-05), falling back to first_seen_at. `updated_at` is informational only.
 """
 
+import re
 from datetime import datetime
 from typing import Any
 
@@ -31,6 +32,35 @@ def _metadata_value(job: dict[str, Any], *names: str) -> str | None:
         if any(n in name for n in names) and isinstance(item.get("value"), str):
             return str(item["value"])
     return None
+
+
+def _metadata_values(job: dict[str, Any], name_part: str) -> list[str]:
+    values: list[str] = []
+    for item in job.get("metadata") or []:
+        if name_part in str(item.get("name") or "").lower():
+            value = item.get("value")
+            items = value if isinstance(value, list) else [value]
+            values += [str(v).strip() for v in items if isinstance(v, str) and v.strip()]
+    return values
+
+
+# A location.name that names a work arrangement, not a place.
+_ARRANGEMENT_RE = re.compile(
+    r"^\s*(hybrid|in[- ]?office|on[- ]?site|office|remote|distributed|flexible)\s*$", re.I
+)
+
+
+def _location(job: dict[str, Any]) -> tuple[str | None, str | None]:
+    """(location, work arrangement). Some boards (e.g. Cloudflare) set location.name to just "Hybrid"
+    and list the places in a custom field such as "Job Posting Location"."""
+    name = (job.get("location") or {}).get("name")
+    if name and not _ARRANGEMENT_RE.match(name):
+        return name, None
+    places = _metadata_values(job, "location")
+    if not places:
+        return name, name
+    joined = " | ".join(dict.fromkeys(places))
+    return (f"{joined} ({name.strip()})" if name else joined), name
 
 
 class GreenhouseSource(JobSource):
@@ -63,7 +93,7 @@ class GreenhouseSource(JobSource):
         title = str(job.get("title") or "").strip()
         if not title:
             raise MalformedJobError("Greenhouse job without a title")
-        location = (job.get("location") or {}).get("name")
+        location, arrangement = _location(job)
         return JobIn(
             source=self.source,
             external_id=raw.external_id,
@@ -71,7 +101,7 @@ class GreenhouseSource(JobSource):
             company_domain=raw.company_domain,
             title=title,
             location=location,
-            remote=detect_remote(location, _metadata_value(job, "workplace", "remote")),
+            remote=detect_remote(location, _metadata_value(job, "workplace", "remote") or arrangement),
             employment_type=detect_employment_type(title, _metadata_value(job, "employment", "commitment")),
             description_text=html_to_text(job.get("content")),
             url=job.get("absolute_url"),

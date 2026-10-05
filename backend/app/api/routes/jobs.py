@@ -9,7 +9,7 @@ from app.api.errors import api_error, llm_errors
 from app.core.auth import CurrentUser
 from app.core.db import get_session
 from app.models import Company, Job, UserCompanyBlock, UserPreferences
-from app.schemas.jobs import CompanyBrief, EmploymentFilter, JobFeed, JobOut, ManualJobIn
+from app.schemas.jobs import EmploymentFilter, JobFeed, JobOut, ManualJobIn
 from app.services.jobs.companies import find_or_create_company
 from app.services.jobs.ingest import upsert_jobs
 from app.services.llm.client import LLMClient
@@ -18,29 +18,12 @@ from app.services.registry import get_llm_client, get_source_http
 from app.services.sources.base import MalformedJobError
 from app.services.sources.http import PoliteHttpClient, SourceHTTPError
 from app.services.sources.manual import ManualJobResolver, NotAJobPostingError
+from app.services.usage import logged_llm_usage
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 Session = Annotated[AsyncSession, Depends(get_session)]
 _effective = func.coalesce(Job.posted_at, Job.first_seen_at)
-
-
-def _out(job: Job, company: Company, now: datetime) -> JobOut:
-    effective = job.posted_at or job.first_seen_at
-    return JobOut(
-        id=job.id,
-        title=job.title,
-        company=CompanyBrief.model_validate(company),
-        location=job.location,
-        remote=job.remote,
-        employment_type=job.employment_type,
-        url=job.url,
-        source=job.source.value,
-        posted_at=job.posted_at,
-        first_seen_at=job.first_seen_at,
-        effective_date=effective,
-        age_days=max(0, (now - effective).days),
-    )
 
 
 @router.get("", response_model=JobFeed)
@@ -81,7 +64,9 @@ async def job_feed(
     total = await session.scalar(select(func.count()).select_from(base.subquery())) or 0
     rows = (await session.execute(base.order_by(_effective.desc(), Job.id).limit(limit).offset(offset))).all()
     return JobFeed(
-        items=[_out(job, company, now) for job, company in rows], total=total, max_age_days=age_limit
+        items=[JobOut.from_row(job, company, now) for job, company in rows],
+        total=total,
+        max_age_days=age_limit,
     )
 
 
@@ -99,7 +84,8 @@ async def add_manual_job(
     try:
         with llm_errors():
             api_key = await resolve_api_key(session, user.id)
-            manual = await resolver.resolve(url, api_key)
+            async with logged_llm_usage(session, user.id, "parse_job_page"):
+                manual = await resolver.resolve(url, api_key)
     except SourceHTTPError as exc:
         code = status.HTTP_404_NOT_FOUND if exc.status == 404 else status.HTTP_502_BAD_GATEWAY
         raise api_error(
@@ -127,4 +113,4 @@ async def add_manual_job(
     job = await session.get(Job, (result.job_ids or [])[0])
     if job is None:  # pragma: no cover - the upsert just returned this id
         raise api_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "job_missing", "Job vanished after saving.")
-    return _out(job, company, now)
+    return JobOut.from_row(job, company, now)

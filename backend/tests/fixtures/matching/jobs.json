@@ -1,0 +1,59 @@
+{
+  "__note": "Fictional companies and postings for the Phase 3 matching tests. The first three pass the hard filters for the fixture user (internship, Bangalore, remote OK); the rest don't.",
+  "jobs": [
+    {
+      "key": "relevant",
+      "company": {"name": "Ledgerline", "domain": "ledgerline.example"},
+      "title": "Backend Engineering Intern",
+      "location": "Bengaluru, India",
+      "remote": false,
+      "employment_type": "internship",
+      "description_text": "About Ledgerline\nWe build reconciliation software for Indian fintechs.\n\nWhat you'll do\n- Build and maintain REST APIs in Python (Django) backed by PostgreSQL.\n- Write tests and ship features with code review from senior engineers.\n- Containerise services with Docker and help improve our CI pipeline.\n\nWho you are\n- Currently pursuing a B.Tech/B.E. in Computer Science or a related field (graduating 2027 or 2028).\n- Comfortable with Python and SQL; you have built at least one backend project.\n- Bonus: open source contributions, experience with Node.js or React.\n\nThis is a 6-month internship in our Bengaluru office."
+    },
+    {
+      "key": "irrelevant",
+      "company": {"name": "Brightcart", "domain": "brightcart.example"},
+      "title": "Sales Development Intern",
+      "location": "Bangalore, Karnataka",
+      "remote": false,
+      "employment_type": "internship",
+      "description_text": "Brightcart is a D2C commerce platform. As a Sales Development Intern you will:\n- Make 60+ outbound cold calls a day to prospective merchants.\n- Qualify leads and book demos for account executives.\n- Keep HubSpot CRM records up to date.\n\nRequirements\n- Excellent spoken English and Hindi or Kannada.\n- An MBA or BBA (pursuing) is preferred.\n- Target-driven, comfortable with daily call quotas.\n\nStipend plus incentives on booked demos."
+    },
+    {
+      "key": "unknown_type",
+      "company": {"name": "Ferrovia Cloud", "domain": "ferrovia.example"},
+      "title": "Platform Engineer",
+      "location": "Remote - India",
+      "remote": true,
+      "employment_type": null,
+      "description_text": "Ferrovia Cloud runs managed Kubernetes for logistics companies.\n\nYou will own our internal platform: Kubernetes clusters, Terraform modules and the Go services that provision them.\n\nRequirements\n- 3+ years of professional experience running production infrastructure.\n- Strong Go and Kubernetes experience; Terraform and AWS.\n- On-call participation.\n\nThis is a full-time, permanent position, remote within India."
+    },
+    {
+      "key": "wrong_type",
+      "company": {"name": "Ledgerline", "domain": "ledgerline.example"},
+      "title": "Senior Backend Engineer",
+      "location": "Bengaluru, India",
+      "remote": false,
+      "employment_type": "full_time",
+      "description_text": "7+ years building distributed systems in Python. Kafka, Kubernetes, PostgreSQL at scale. You will lead a team of five engineers."
+    },
+    {
+      "key": "wrong_place",
+      "company": {"name": "Bayline Robotics", "domain": "bayline.example"},
+      "title": "Software Engineering Intern",
+      "location": "San Francisco, CA",
+      "remote": false,
+      "employment_type": "internship",
+      "description_text": "Summer internship in our San Francisco office building Python services for warehouse robots. Must be authorised to work in the US."
+    },
+    {
+      "key": "remote_us",
+      "company": {"name": "Bayline Robotics", "domain": "bayline.example"},
+      "title": "Backend Intern (Remote)",
+      "location": "Remote - USA",
+      "remote": true,
+      "employment_type": "internship",
+      "description_text": "Remote internship for students based in the United States. Python, Django, PostgreSQL."
+    }
+  ]
+}

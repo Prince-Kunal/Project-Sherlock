@@ -4,9 +4,12 @@ Everything that talks to the outside world is obtained here, so tests and `USE_F
 the whole app onto fakes without touching call sites.
 """
 
+import hashlib
 import json
+import re
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 from app.core.config import Settings, get_settings
 from app.core.redis import get_redis
@@ -14,6 +17,7 @@ from app.services.contacts.base import ContactProvider
 from app.services.contacts.fake import FakeContactProvider
 from app.services.email.fake_gmail import FakeGmailClient
 from app.services.email.gmail import GmailClient
+from app.services.embeddings.bge import BgeEmbedder
 from app.services.embeddings.embedder import Embedder
 from app.services.embeddings.fake import FakeEmbedder
 from app.services.llm.anthropic import AnthropicClient
@@ -27,11 +31,31 @@ from app.services.sources.http import PoliteHttpClient
 _FAKE_RESPONSES = Path(__file__).parent / "llm" / "fake_responses"
 
 
+_JOB_REF_RE = re.compile(r'"job_ref": "([0-9a-f]{8})"')
+
+
+def _fake_match_scores(prompt: str) -> list[dict[str, Any]]:
+    """USE_FAKES answer for prompts/match.md: a stable pseudo-random score per job ref."""
+    refs = _JOB_REF_RE.findall(prompt.split("## Jobs", 1)[-1])
+    return [
+        {
+            "job_ref": ref,
+            "fit_score": 40 + int(hashlib.sha256(ref.encode()).hexdigest(), 16) % 56,
+            "employment_type": "unknown",
+            "matched_skills": [],
+            "missing_must_haves": [],
+            "reasoning": "Sample score from the fake LLM (USE_FAKES=true).",
+        }
+        for ref in refs
+    ]
+
+
 def build_fake_llm_client() -> FakeLLMClient:
     """For USE_FAKES=true local runs: canned answers so the UI works without an API key."""
     client = FakeLLMClient()
     for path in sorted(_FAKE_RESPONSES.glob("*.json")):
         client.add_response(path.stem, json.loads(path.read_text()))
+    client.add_responder("match", _fake_match_scores)
     return client
 
 
@@ -58,9 +82,10 @@ def get_llm_client() -> LLMClient:
 
 @lru_cache
 def get_embedder() -> Embedder:
-    if get_settings().use_fakes:
+    settings = get_settings()
+    if settings.use_fakes:
         return FakeEmbedder()
-    raise NotImplementedError("real Embedder (bge-small) arrives in Phase 3; set USE_FAKES=true")
+    return BgeEmbedder(settings.embed_model, settings.embed_cache_dir)
 
 
 @lru_cache

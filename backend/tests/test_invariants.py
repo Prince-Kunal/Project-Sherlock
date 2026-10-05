@@ -4,6 +4,7 @@ import uuid
 
 import pytest
 from cryptography.fernet import Fernet
+from httpx import AsyncClient
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -102,3 +103,30 @@ def test_secret_encrypted_with_other_key_is_rejected(monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(get_settings(), "fernet_key", Fernet.generate_key().decode())
     with pytest.raises(SecretDecryptionError):
         decrypt_secret(ciphertext)
+
+
+# --- Invariant 5: users only see their own matches ---
+
+
+async def test_user_cannot_see_or_change_another_users_matches(
+    auth_client: AsyncClient, session: AsyncSession, other_user_headers: dict[str, str]
+) -> None:
+    from tests.test_matches_api import scored_user
+
+    me = uuid.UUID((await auth_client.get("/auth/me")).json()["id"])
+    await scored_user(session, me)
+    mine = (await auth_client.get("/matches", params={"min_score": 0})).json()["items"]
+    assert len(mine) == 2
+
+    theirs = await auth_client.get("/matches", params={"min_score": 0}, headers=other_user_headers)
+    assert theirs.status_code == 200
+    assert theirs.json()["items"] == []
+    for action in ("shortlist", "hide", "restore"):
+        response = await auth_client.post(f"/matches/{mine[0]['id']}/{action}", headers=other_user_headers)
+        assert response.status_code == 404, action
+    # Blocking is per user: their block doesn't hide my matches.
+    company_id = mine[0]["job"]["company"]["id"]
+    assert (
+        await auth_client.post(f"/companies/{company_id}/block", headers=other_user_headers)
+    ).status_code == 200
+    assert len((await auth_client.get("/matches", params={"min_score": 0})).json()["items"]) == 2

@@ -72,3 +72,16 @@ async def test_fake_job_source_normalises() -> None:
     assert jobs[0].employment_type == "internship"
     assert jobs[1].remote is True
     assert all(j.posted_at is not None for j in jobs)
+
+
+async def test_fake_mode_scores_whatever_jobs_the_match_prompt_contains() -> None:
+    from app.schemas.matches import ScoredJob
+    from app.services.llm.prompt_loader import load_prompt
+    from app.services.registry import build_fake_llm_client
+
+    request = load_prompt("match").request(
+        tier="fast", candidate="{}", jobs='[{"job_ref": "0123abcd"}, {"job_ref": "fedc9876"}]'
+    )
+    scores = await build_fake_llm_client().generate(request, list[ScoredJob])
+    assert [s.job_ref for s in scores] == ["0123abcd", "fedc9876"]  # not the prompt's example ref
+    assert all(40 <= s.fit_score <= 95 for s in scores)

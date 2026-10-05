@@ -9,6 +9,9 @@ import hashlib
 import json
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -65,6 +68,26 @@ class LLMRequest:
     use_cache: bool = True
 
 
+@dataclass
+class CallMeter:
+    """Counts provider calls (not cache hits) made inside `metered()`, for the usage ledger."""
+
+    calls: int = 0
+
+
+_meter: ContextVar[CallMeter | None] = ContextVar("llm_call_meter", default=None)
+
+
+@contextmanager
+def metered() -> Iterator[CallMeter]:
+    meter = CallMeter()
+    token = _meter.set(meter)
+    try:
+        yield meter
+    finally:
+        _meter.reset(token)
+
+
 _RETRY_SUFFIX = """
 
 ---
@@ -81,9 +104,13 @@ class LLMClient(ABC):
     def __init__(self, cache: LLMCache | None = None) -> None:
         self._cache = cache
 
-    async def generate[T](self, request: LLMRequest, output_type: type[T]) -> T:
+    async def generate[T](
+        self, request: LLMRequest, output_type: type[T], *, response_schema: dict[str, Any] | None = None
+    ) -> T:
+        """`response_schema` overrides the schema sent to the provider. Batch prompts use it to ask for
+        strict items while validating leniently here, so one bad item can be re-requested alone."""
         adapter: TypeAdapter[T] = TypeAdapter(output_type)
-        schema = adapter.json_schema()
+        schema = response_schema or adapter.json_schema()
         cache_key = _cache_key(request, schema)
 
         if self._cache is not None and request.use_cache:
@@ -97,6 +124,8 @@ class LLMClient(ABC):
         prompt = request.prompt
         errors = ""
         for attempt in (1, 2):
+            if (meter := _meter.get()) is not None:
+                meter.calls += 1
             raw = await self._complete_json(request, prompt, schema)
             try:
                 result = adapter.validate_json(raw)

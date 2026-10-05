@@ -1,0 +1,41 @@
+[
+  {
+    "fit_score": 90,
+    "employment_type": "internship",
+    "matched_skills": [
+      "python",
+      "django",
+      "postgresql",
+      "docker",
+      "rest api"
+    ],
+    "missing_must_haves": [],
+    "reasoning": "You match the tech stack with Python, Django, PostgreSQL, and Docker, and you are a CS student looking for an internship. Your graduation year is slightly outside their preferred 2027-2028 window, but it's a stellar fit.",
+    "job_ref": "25a0d385"
+  },
+  {
+    "fit_score": 10,
+    "employment_type": "internship",
+    "matched_skills": [],
+    "missing_must_haves": [
+      "sales experience",
+      "crm usage",
+      "cold calling"
+    ],
+    "reasoning": "You are a Computer Science student seeking backend and software engineering roles, whereas this is a sales development cold-calling internship. Your background and target roles do not align with sales.",
+    "job_ref": "9d63996f"
+  },
+  {
+    "fit_score": 30,
+    "employment_type": "full_time",
+    "matched_skills": [],
+    "missing_must_haves": [
+      "3+ years experience",
+      "go",
+      "kubernetes",
+      "terraform"
+    ],
+    "reasoning": "This is a full-time Platform Engineer role requiring 3+ years of professional infrastructure experience and Go/Kubernetes expertise, which exceeds your student and open-source background.",
+    "job_ref": "6b9e1e34"
+  }
+]

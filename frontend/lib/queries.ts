@@ -10,6 +10,9 @@ import type {
   JobFilters,
   LLMKeyStatus,
   MasterResume,
+  Match,
+  MatchFeed,
+  MatchFilters,
   Preferences,
   ResumeOut,
   ResumeVersion,
@@ -152,7 +155,7 @@ export function useDeleteLlmKey() {
   });
 }
 
-function toQuery(filters: JobFilters): string {
+function toQuery(filters: JobFilters | MatchFilters): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
     if (value !== undefined && value !== "") params.set(key, String(value));
@@ -184,5 +187,43 @@ export function usePollNow() {
   return useMutation({
     mutationFn: () =>
       apiFetch<{ job_id: string | null }>("/admin/poll", { method: "POST" }),
+  });
+}
+
+export function useMatches(filters: MatchFilters) {
+  return useQuery({
+    queryKey: ["matches", filters],
+    queryFn: () => apiFetch<MatchFeed>(`/matches?${toQuery(filters)}`),
+    placeholderData: (previous) => previous,
+  });
+}
+
+export type MatchAction = "shortlist" | "hide" | "restore";
+
+export function useMatchAction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, action }: { id: string; action: MatchAction }) =>
+      apiFetch<Match>(`/matches/${id}/${action}`, { method: "POST" }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["matches"] }),
+  });
+}
+
+export function useBlockCompany() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (companyId: string) =>
+      apiFetch<unknown>(`/companies/${companyId}/block`, { method: "POST" }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["matches"] });
+      void queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    },
+  });
+}
+
+export function useRefreshMatches() {
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<{ queued: boolean }>("/matches/refresh", { method: "POST" }),
   });
 }

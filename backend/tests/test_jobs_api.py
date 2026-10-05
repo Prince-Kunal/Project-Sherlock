@@ -330,7 +330,7 @@ async def test_admin_poll_enqueues_worker_job(
     async def fake_pool(*_: object, **__: object) -> Pool:
         return Pool()
 
-    monkeypatch.setattr("app.api.routes.admin.create_pool", fake_pool)
+    monkeypatch.setattr("app.workers.queue.create_pool", fake_pool)
     response = await auth_client.post("/admin/poll")
     assert response.status_code == 202
     assert enqueued == ["poll_sources"]

@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
+from app.models import Company, Job
 from app.models.enums import AtsType, SizeHint
 
 
@@ -28,6 +29,24 @@ class JobOut(BaseModel):
     first_seen_at: datetime
     effective_date: datetime  # posted_at if known, else first_seen_at
     age_days: int
+
+    @classmethod
+    def from_row(cls, job: Job, company: Company, now: datetime) -> "JobOut":
+        effective = job.posted_at or job.first_seen_at
+        return cls(
+            id=job.id,
+            title=job.title,
+            company=CompanyBrief.model_validate(company),
+            location=job.location,
+            remote=job.remote,
+            employment_type=job.employment_type,
+            url=job.url,
+            source=job.source.value,
+            posted_at=job.posted_at,
+            first_seen_at=job.first_seen_at,
+            effective_date=effective,
+            age_days=max(0, (now - effective).days),
+        )
 
 
 class JobFeed(BaseModel):

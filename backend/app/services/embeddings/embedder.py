@@ -5,7 +5,7 @@ from app.models.company import EMBEDDING_DIM
 
 
 class Embedder(ABC):
-    """Text → L2-normalised vectors. The real bge-small implementation arrives in Phase 3."""
+    """Text → L2-normalised vectors (bge.py in production, fake.py in tests)."""
 
     dim: int = EMBEDDING_DIM
 

@@ -24,6 +24,7 @@ from app.services.resume.ats_check import AtsExpectations, AtsReport, ats_check
 from app.services.resume.parser import ResumeExtractionError, parse_resume
 from app.services.resume.render import RenderError, render_resume, resume_filename
 from app.services.resume.skills import get_lexicon
+from app.services.usage import logged_llm_usage
 
 router = APIRouter(prefix="/resume", tags=["resume"])
 
@@ -74,7 +75,8 @@ async def upload_resume(
     with llm_errors():
         api_key = await resolve_api_key(session, user.id)
         try:
-            resume = await parse_resume(data, file.filename or f"resume{suffix}", llm, api_key)
+            async with logged_llm_usage(session, user.id, "parse_resume"):
+                resume = await parse_resume(data, file.filename or f"resume{suffix}", llm, api_key)
         except ResumeExtractionError as exc:
             raise api_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "unreadable_resume", str(exc)) from exc
 
@@ -164,7 +166,8 @@ async def tag_skills(body: TagSkillsIn, user: CurrentUser, session: Session, llm
         request = load_prompt("tag_skills").request(
             tier="fast", api_key=api_key, skills_section=skills_section, bullets=bullets
         )
-        tagged = await llm.generate(request, list[TaggedBullet])
+        async with logged_llm_usage(session, user.id, "tag_skills"):
+            tagged = await llm.generate(request, list[TaggedBullet])
     lexicon = get_lexicon()
     by_index = {t.index: t for t in tagged if 0 <= t.index < len(body.texts)}
     return [

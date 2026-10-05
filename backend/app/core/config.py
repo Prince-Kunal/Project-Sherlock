@@ -42,7 +42,15 @@ class Settings(BaseSettings):
     allow_owner_key_fallback: bool = False
 
     embed_model: str = "BAAI/bge-small-en-v1.5"
-    embed_min_sim: float = 0.35
+    embed_min_sim: float = 0.6  # bge-small: unrelated jobs score ~0.55, related ones 0.65+
+    # Downloaded model files (~65 MB). docker-compose mounts a volume here so restarts don't re-download.
+    embed_cache_dir: str = str(Path.home() / ".cache" / "sherlock" / "models")
+
+    # Matching (PLAN.md Phase 3). The fast model's free tier is ~20 requests/day per key, shared with
+    # resume parsing, so scoring gets a per-user daily allowance of batched requests.
+    match_batch_size: int = 10
+    match_candidates_per_run: int = 50
+    match_daily_llm_calls: int = 6
 
     hn_enabled: bool = True  # parse HN "Who is hiring" with the owner's key (needs GEMINI_API_KEY)
 

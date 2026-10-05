@@ -1,8 +1,6 @@
 import uuid
 from typing import Annotated
 
-from arq import create_pool
-from arq.connections import RedisSettings
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
 from sqlalchemy import func, or_, select
@@ -10,7 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import api_error
 from app.core.auth import AdminUser
-from app.core.config import get_settings
 from app.core.db import get_session
 from app.models import Company, Job
 from app.models.enums import AtsType
@@ -22,6 +19,7 @@ from app.services.sources.greenhouse import GreenhouseSource
 from app.services.sources.http import PoliteHttpClient, SourceHTTPError
 from app.services.sources.lever import LeverSource
 from app.services.sources.text import normalize_domain
+from app.workers.queue import enqueue
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -110,9 +108,4 @@ class PollQueued(BaseModel):
 @router.post("/poll", response_model=PollQueued, status_code=status.HTTP_202_ACCEPTED)
 async def trigger_poll(_: AdminUser) -> PollQueued:
     """Queue poll_sources on the worker now instead of waiting for the 6-hourly cron."""
-    pool = await create_pool(RedisSettings.from_dsn(get_settings().redis_url))
-    try:
-        job = await pool.enqueue_job("poll_sources", _job_id="poll_sources:manual")
-    finally:
-        await pool.aclose()
-    return PollQueued(job_id=job.job_id if job else None)
+    return PollQueued(job_id=await enqueue("poll_sources", job_id="poll_sources:manual"))

@@ -91,6 +91,39 @@ def test_greenhouse_missing_fields() -> None:
         source.normalize(RawJob(source=JobSourceType.GREENHOUSE, external_id="1", payload=job))
 
 
+@pytest.mark.parametrize(
+    ("name", "metadata", "location", "remote"),
+    [
+        # Cloudflare's real shape: location.name is the arrangement, places are in custom metadata.
+        (
+            "Hybrid",
+            [{"name": "Job Posting Location", "value": ["Bengaluru, India"]}],
+            "Bengaluru, India (Hybrid)",
+            False,
+        ),
+        (
+            "Distributed",
+            [{"name": "Job Posting Location", "value": ["Austin, US", "New York, US"]}],
+            "Austin, US | New York, US (Distributed)",
+            True,
+        ),
+        ("Hybrid", [], "Hybrid", False),  # nothing better known
+        ("London, UK", [{"name": "Job Posting Location", "value": ["Paris"]}], "London, UK", None),
+    ],
+)
+def test_greenhouse_location_from_metadata_when_name_is_an_arrangement(
+    name: str, metadata: list[dict[str, Any]], location: str, remote: bool | None
+) -> None:
+    source = GreenhouseSource(http=None)  # type: ignore[arg-type]
+    job = copy.deepcopy(load("greenhouse/board_figma.json")["jobs"][0])
+    job["location"] = {"name": name}
+    job["metadata"] = metadata
+    out = source.normalize(
+        RawJob(source=JobSourceType.GREENHOUSE, external_id="1", payload=job, company_name="Cloudflare")
+    )
+    assert (out.location, out.remote) == (location, remote)
+
+
 # --- Lever --------------------------------------------------------------------------------------------
 
 

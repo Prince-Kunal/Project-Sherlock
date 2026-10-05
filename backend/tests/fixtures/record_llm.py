@@ -3,6 +3,7 @@
 Run from backend/ with a real GEMINI_API_KEY in .env (one fast-model request per item):
     uv run python -m tests.fixtures.record_llm            # resumes (parse_resume)
     uv run python -m tests.fixtures.record_llm hn         # HN thread fixture (parse_hn_comment)
+    uv run python -m tests.fixtures.record_llm match      # matching fixture jobs (match)
 
 Re-run whenever the corresponding prompt changes version.
 """
@@ -55,6 +56,22 @@ async def record_hn() -> None:
     print(f"recorded {out.relative_to(FIXTURES)} ({len(jobs)} jobs, prompt v{prompt.version})")
 
 
+async def record_match() -> None:
+    from app.services.matching.profile import candidate_payload
+    from app.services.matching.rerank import Reranker, job_payload
+    from tests.matching_fixtures import FIXTURE_PREFS, SCORED_KEYS, fixture_jobs, fixture_resume, unsaved_job
+
+    candidate = candidate_payload(FIXTURE_PREFS, fixture_resume())
+    jobs = [unsaved_job(item) for item in fixture_jobs() if item["key"] in SCORED_KEYS]
+    scores = await Reranker(_client()).request_scores(
+        candidate, [job_payload(job, company) for job, company in jobs], None
+    )
+    out = FIXTURES / "llm" / "match" / "fixture_jobs.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps([s.model_dump() for s in scores.values()], indent=2) + "\n")
+    print(f"recorded {out.relative_to(FIXTURES)} ({len(scores)} of {len(jobs)} jobs scored)")
+
+
 async def main() -> None:
     settings = get_settings()
     client = _client()
@@ -72,4 +89,5 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(record_hn() if sys.argv[1:] == ["hn"] else main())
+    modes = {"hn": record_hn, "match": record_match}
+    asyncio.run(modes[sys.argv[1]]() if sys.argv[1:] else main())

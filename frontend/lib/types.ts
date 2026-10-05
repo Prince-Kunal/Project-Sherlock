@@ -136,3 +136,36 @@ export type JobFilters = {
   limit: number;
   offset: number;
 };
+
+export type MatchStatus =
+  "new" | "shortlisted" | "hidden" | "in_pipeline" | "expired";
+
+export type Match = {
+  id: string;
+  job: Job;
+  fit_score: number | null;
+  embedding_score: number | null;
+  matched_skills: string[];
+  missing_skills: string[];
+  reasoning: string;
+  status: MatchStatus;
+  created_at: string;
+};
+
+export type MatchFeed = {
+  items: Match[];
+  total: number;
+  min_score: number;
+  scoring: {
+    llm_key_configured: boolean;
+    calls_last_24h: number;
+    daily_limit: number;
+  };
+};
+
+export type MatchFilters = {
+  status: "active" | MatchStatus;
+  min_score?: number;
+  limit: number;
+  offset: number;
+};
