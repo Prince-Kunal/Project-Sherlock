@@ -7,6 +7,7 @@ the whole app onto fakes without touching call sites.
 import hashlib
 import json
 import re
+from collections.abc import Callable
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,7 @@ from app.core.config import Settings, get_settings
 from app.core.redis import get_redis
 from app.services.contacts.base import ContactProvider
 from app.services.contacts.fake import FakeContactProvider
+from app.services.contacts.hunter import HunterProvider
 from app.services.email.fake_gmail import FakeGmailClient
 from app.services.email.gmail import GmailClient
 from app.services.embeddings.bge import BgeEmbedder
@@ -109,11 +111,14 @@ def get_embedder() -> Embedder:
     return BgeEmbedder(settings.embed_model, settings.embed_cache_dir)
 
 
-@lru_cache
-def get_contact_provider() -> ContactProvider:
+_fake_contacts = FakeContactProvider(resolve_names=False)
+
+
+def get_contact_provider_factory() -> Callable[[str], ContactProvider]:
+    """A function from a user's Hunter key to a provider (each user brings their own key)."""
     if get_settings().use_fakes:
-        return FakeContactProvider()
-    raise NotImplementedError("Hunter ContactProvider arrives in Phase 5; set USE_FAKES=true")
+        return lambda _key: _fake_contacts
+    return HunterProvider
 
 
 _fake_mailboxes: dict[str, FakeGmailClient] = {}

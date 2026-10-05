@@ -12,6 +12,7 @@ import {
 import Link from "next/link";
 import { useState } from "react";
 
+import { ContactPanel } from "@/components/jobs/contact-panel";
 import { TailorPreviewButton } from "@/components/jobs/tailor-preview";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -262,6 +263,11 @@ function MatchRow({ match }: { match: Match }) {
               ) : (
                 <span className="font-medium">{job.title}</span>
               )}
+              {match.status === "in_pipeline" && (
+                <Badge variant="secondary" className="ml-2 align-middle">
+                  In pipeline
+                </Badge>
+              )}
               <p className="text-muted-foreground text-sm">
                 {job.company.name} · {job.location ?? "Location not stated"}
                 {job.remote && " · Remote"} · {age(job.age_days)}
@@ -393,9 +399,13 @@ function MatchRow({ match }: { match: Match }) {
             Why this score
           </button>
           {open && <p className="mt-1 text-sm">{match.reasoning}</p>}
-          {editable && match.fit_score !== null && (
-            <TailorPreviewButton matchId={match.id} />
-          )}
+          {(editable || match.status === "in_pipeline") &&
+            match.fit_score !== null && (
+              <>
+                <ContactPanel match={match} />
+                <TailorPreviewButton matchId={match.id} />
+              </>
+            )}
           {(action.isError || block.isError) && (
             <p className="text-destructive mt-1 text-sm">
               {errorMessage(action.error ?? block.error)}

@@ -58,6 +58,7 @@ class EmailSource(StrEnum):
     APOLLO = "apollo"
     MANUAL = "manual"
     PATTERN = "pattern"
+    HN = "hn"  # an address the company posted in its HN "Who is hiring" comment
 
 
 class VerificationStatus(StrEnum):
@@ -124,6 +125,9 @@ class OutreachEventType(StrEnum):
     CLOSED = "closed"
     OUTCOME_SET = "outcome_set"
     UPGRADED_TO_JOB = "upgraded_to_job"  # Phase 8 upgrade path
+    FAILED = "failed"  # payload: {"reason": ...}
+    RETRIED = "retried"  # failed → drafting after the cause was fixed (e.g. a contact added by hand)
+    CONTACT_CHANGED = "contact_changed"
 
 
 class SuppressionReason(StrEnum):
@@ -139,6 +143,13 @@ class OAuthProvider(StrEnum):
 class LLMProvider(StrEnum):
     GEMINI = "gemini"
     ANTHROPIC = "anthropic"
+
+
+class ServiceKeyType(StrEnum):
+    """Non-LLM services each user brings their own key for (Hunter's free tier is per account)."""
+
+    HUNTER = "hunter"
+    APOLLO = "apollo"
 
 
 class UsageProvider(StrEnum):

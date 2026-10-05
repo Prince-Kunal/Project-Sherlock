@@ -18,13 +18,22 @@ from app.models import Company, Job, JobMatch
 from app.models.enums import JobMatchStatus
 from app.schemas.jobs import JobOut
 from app.schemas.matches import MatchFeed, MatchOut, MatchStatusFilter, ScoringStatus
+from app.schemas.outreach import OutreachOut
 from app.schemas.resume import MasterResume
 from app.schemas.tailor import TailorPreviewOut
+from app.services.contacts.service import (
+    OutreachConflictError,
+    ProviderFactory,
+    build_finder,
+    find_contact_for,
+    start_job_outreach,
+)
+from app.services.contacts.views import latest_outreach_by_job, outreach_out
 from app.services.llm.client import LLMClient
 from app.services.llm.user_keys import get_key_row, resolve_api_key
 from app.services.matching.filters import hard_filter_conditions
 from app.services.matching.pipeline import OPERATION, daily_window_start, load_preferences
-from app.services.registry import get_llm_client
+from app.services.registry import get_contact_provider_factory, get_llm_client
 from app.services.resume import store
 from app.services.resume.files import find_pdf, preview_folder, save_tailored_pdf
 from app.services.resume.tailor import Tailor, TailorError
@@ -35,7 +44,7 @@ router = APIRouter(prefix="/matches", tags=["matches"])
 
 Session = Annotated[AsyncSession, Depends(get_session)]
 
-_ACTIVE = (JobMatchStatus.NEW, JobMatchStatus.SHORTLISTED)
+_ACTIVE = (JobMatchStatus.NEW, JobMatchStatus.SHORTLISTED, JobMatchStatus.IN_PIPELINE)
 # Where each action may move a match from. In-pipeline and expired matches are not user-editable.
 _ACTIONS: dict[str, tuple[JobMatchStatus, tuple[JobMatchStatus, ...]]] = {
     "shortlist": (JobMatchStatus.SHORTLISTED, (JobMatchStatus.NEW, JobMatchStatus.HIDDEN)),
@@ -44,7 +53,9 @@ _ACTIONS: dict[str, tuple[JobMatchStatus, tuple[JobMatchStatus, ...]]] = {
 }
 
 
-def _out(match: JobMatch, job: Job, company: Company, now: datetime) -> MatchOut:
+def _out(
+    match: JobMatch, job: Job, company: Company, now: datetime, outreach: OutreachOut | None = None
+) -> MatchOut:
     return MatchOut(
         id=match.id,
         job=JobOut.from_row(job, company, now),
@@ -55,6 +66,7 @@ def _out(match: JobMatch, job: Job, company: Company, now: datetime) -> MatchOut
         reasoning=match.reasoning,
         status=match.status,
         created_at=match.created_at,
+        outreach=outreach,
     )
 
 
@@ -117,8 +129,12 @@ async def list_matches(
 
     calls = await llm_calls_since(session, user.id, OPERATION, daily_window_start(now))
     key = await get_key_row(session, user.id)
+    outreach = await latest_outreach_by_job(session, user.id, [j.id for _, j, _ in rows])
     return MatchFeed(
-        items=[_out(m, j, c, now) for m, j, c in rows],
+        items=[
+            _out(m, j, c, now, await outreach_out(session, outreach[j.id]) if j.id in outreach else None)
+            for m, j, c in rows
+        ],
         total=total,
         min_score=score_floor,
         scoring=ScoringStatus(
@@ -248,3 +264,32 @@ async def tailored_pdf(match_id: uuid.UUID, user: CurrentUser, session: Session)
         content_disposition_type="inline",
         headers={"Cache-Control": "no-store"},
     )
+
+
+# --- Contact discovery (PLAN.md Phase 5) -----------------------------------------------------------
+
+
+@router.post("/{match_id}/find-contact", response_model=OutreachOut)
+async def find_contact(
+    match_id: uuid.UUID,
+    user: CurrentUser,
+    session: Session,
+    factory: Annotated[ProviderFactory, Depends(get_contact_provider_factory)],
+) -> OutreachOut:
+    """Start (or resume) this job's outreach and find the person to email. When nobody suitable is
+    found the outreach is `failed` with a reason (e.g. `no_contact`) and a contact can be added by hand."""
+    match, job, company = await _owned(session, user.id, match_id)
+    company_name = company.name
+    try:
+        outreach = await start_job_outreach(session, user.id, match, job)
+    except OutreachConflictError as exc:
+        await session.rollback()
+        raise api_error(
+            status.HTTP_409_CONFLICT,
+            "outreach_exists",
+            f"You already have an outreach in progress at {company_name}; one at a time per company.",
+        ) from exc
+    finder = await build_finder(session, user.id, factory, datetime.now(UTC))
+    await find_contact_for(session, outreach, job, company, finder, actor_id=user.id)
+    await session.commit()
+    return await outreach_out(session, outreach)

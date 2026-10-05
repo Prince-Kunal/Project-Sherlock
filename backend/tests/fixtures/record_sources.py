@@ -93,5 +93,70 @@ def record_adzuna() -> None:
     save("adzuna/search_in.json", data)
 
 
+_FAKE_PEOPLE = [("Asha", "Rao"), ("Vikram", "Iyer"), ("Neha", "Kapoor"), ("Rahul", "Menon"), ("Divya", "Shah"),
+                ("Arjun", "Pillai"), ("Kavya", "Reddy"), ("Rohit", "Bose"), ("Meera", "Joshi"), ("Karan", "Gill")]  # fmt: skip
+
+
+def _anonymise_person(item: dict[str, Any], i: int, domain: str) -> dict[str, Any]:
+    """Real people's names and addresses never go into the repo: keep the shape, invent the person."""
+    first, last = _FAKE_PEOPLE[i % len(_FAKE_PEOPLE)]
+    item.update(first_name=first, last_name=last, value=f"{first.lower()}.{last.lower()}@{domain}")
+    for key in ("linkedin", "twitter", "phone_number"):
+        if key in item:
+            item[key] = None
+    item["sources"] = [
+        {**src, "uri": f"https://{domain}/", "domain": domain} for src in (item.get("sources") or [])[:1]
+    ]
+    return item
+
+
+def record_hunter() -> None:
+    """Needs HUNTER_API_KEY. Costs ~1 search + 1 email-finder + 1 verification credit."""
+    key = os.environ["HUNTER_API_KEY"]
+    c = httpx.Client(timeout=30, headers={**HEADERS, "X-API-KEY": key})
+    base = "https://api.hunter.io/v2"
+    domain = "sarvam.ai"
+    search = c.get(
+        f"{base}/domain-search",
+        params={
+            "domain": domain,
+            "type": "personal",
+            "seniority": "senior,executive",
+            "department": "executive,it,management,hr",
+            "limit": 10,
+        },
+    ).json()
+    if "errors" in search:
+        raise SystemExit(f"Hunter error: {search['errors']}")
+    real_first = search["data"]["emails"][0]
+    search["data"]["emails"] = [
+        _anonymise_person(e, i, domain) for i, e in enumerate(search["data"]["emails"])
+    ]
+    save("hunter/domain_search.json", search)
+
+    finder = c.get(
+        f"{base}/email-finder",
+        params={
+            "domain": domain,
+            "first_name": real_first["first_name"],
+            "last_name": real_first["last_name"],
+        },
+    ).json()
+    if "data" in finder:
+        finder["data"] = _anonymise_person(
+            {**finder["data"], "value": finder["data"].get("email")}, 0, domain
+        )
+        finder["data"]["email"] = finder["data"].pop("value")
+    save("hunter/email_finder.json", finder)
+
+    verify = c.get(f"{base}/email-verifier", params={"email": f"careers@{domain}"}).json()
+    save("hunter/email_verifier.json", verify)
+    text = json.dumps([search, finder, verify])
+    if key in text or real_first.get("value", "\x00") in text:
+        raise SystemExit("a key or a real address leaked into the fixtures")
+    account = c.get(f"{base}/account").json()["data"]["requests"]
+    print("credits after recording:", account)
+
+
 if __name__ == "__main__":
-    record_adzuna() if sys.argv[1:] == ["adzuna"] else main()
+    {"adzuna": record_adzuna, "hunter": record_hunter}.get(sys.argv[1] if sys.argv[1:] else "", main)()

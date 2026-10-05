@@ -11,6 +11,7 @@ from sqlalchemy import (
     String,
     Text,
     Time,
+    UniqueConstraint,
     false,
     text,
     true,
@@ -18,7 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import TimestampedBase, str_enum
-from app.models.enums import LLMProvider, OAuthProvider
+from app.models.enums import LLMProvider, OAuthProvider, ServiceKeyType
 
 
 class User(TimestampedBase):
@@ -85,3 +86,16 @@ class UserLLMKey(TimestampedBase):
     encrypted_api_key: Mapped[str] = mapped_column(Text)
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_quota_exhausted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class UserServiceKey(TimestampedBase):
+    """A user's own key for a non-LLM service (Hunter), Fernet-encrypted (invariant 6)."""
+
+    __tablename__ = "user_service_keys"
+    __table_args__ = (UniqueConstraint("user_id", "service", name="uq_user_service_keys_user_service"),)
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    service: Mapped[ServiceKeyType] = mapped_column(str_enum(ServiceKeyType, "service_key_type"))
+    encrypted_api_key: Mapped[str] = mapped_column(Text)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    quota_exhausted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

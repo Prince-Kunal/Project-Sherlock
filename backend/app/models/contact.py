@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String
+from sqlalchemy import DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import TimestampedBase, str_enum
@@ -26,6 +26,10 @@ class Contact(TimestampedBase):
         str_enum(RoleCategory, "role_category"), server_default=RoleCategory.OTHER.value
     )
     last_contacted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # As reported by the provider; used by the selector (services/contacts/selector.py).
+    seniority: Mapped[str | None] = mapped_column(String(50))
+    department: Mapped[str | None] = mapped_column(String(100))
+    confidence: Mapped[int | None] = mapped_column(Integer)
 
 
 class SuppressionEntry(TimestampedBase):

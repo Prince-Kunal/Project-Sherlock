@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import func, literal_column, update
+from sqlalchemy import func, literal_column, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,13 +28,28 @@ def job_hash(company: Company, job: JobIn) -> str:
     return dedupe_hash(company.domain, company.name, job.title, job.location)
 
 
+async def _keep_name_hashes(session: AsyncSession, company: Company, jobs: list[JobIn]) -> dict[str, str]:
+    """Domain hash → name hash, for jobs first stored before the company's domain was known (e.g. an
+    Adzuna company whose domain contact discovery found later). Those rows keep their original hash,
+    so the next poll updates them instead of creating duplicates."""
+    if not company.domain:
+        return {}
+    pairs = {job_hash(company, j): dedupe_hash(None, company.name, j.title, j.location) for j in jobs}
+    existing = set(
+        (await session.scalars(select(Job.dedupe_hash).where(Job.dedupe_hash.in_(pairs.values())))).all()
+    )
+    return {by_domain: by_name for by_domain, by_name in pairs.items() if by_name in existing}
+
+
 async def upsert_jobs(
     session: AsyncSession, company: Company, jobs: list[JobIn], now: datetime
 ) -> UpsertResult:
     """Insert new jobs; refresh known ones (same dedupe_hash) and mark them seen. Caller commits."""
     rows: dict[str, dict[str, object]] = {}
+    legacy = await _keep_name_hashes(session, company, jobs)
     for job in jobs:
         key = job_hash(company, job)
+        key = legacy.get(key, key)
         if key in rows:  # same company/title/location twice in one batch: keep the first
             continue
         rows[key] = {

@@ -140,6 +140,38 @@ export type JobFilters = {
 export type MatchStatus =
   "new" | "shortlisted" | "hidden" | "in_pipeline" | "expired";
 
+export type VerificationStatus = "valid" | "accept_all" | "unknown" | "invalid";
+
+export type Contact = {
+  id: string;
+  full_name: string;
+  title: string | null;
+  email: string;
+  role_category: "founder" | "eng_manager" | "engineer" | "recruiter" | "other";
+  verification_status: VerificationStatus;
+  email_source: "hunter" | "apollo" | "manual" | "pattern" | "hn";
+};
+
+export type Outreach = {
+  id: string;
+  status: string;
+  campaign_type: "job" | "open";
+  job_id: string | null;
+  company: { id: string; name: string; domain: string | null };
+  contact: Contact | null;
+  failure_reason: string | null;
+  failure_message: string | null;
+  created_at: string;
+};
+
+export type HunterKeyStatus = {
+  configured: boolean;
+  verified_at: string | null;
+  owner_fallback_allowed: boolean;
+  searches_this_month: number;
+  monthly_limit: number;
+};
+
 export type Match = {
   id: string;
   job: Job;
@@ -150,6 +182,7 @@ export type Match = {
   reasoning: string;
   status: MatchStatus;
   created_at: string;
+  outreach: Outreach | null;
 };
 
 export type MatchFeed = {

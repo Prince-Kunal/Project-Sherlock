@@ -7,7 +7,7 @@ from app.models.job import Job, JobMatch
 from app.models.outreach import Outreach, OutreachEvent
 from app.models.resume import MasterResume
 from app.models.usage import UsageLedger
-from app.models.user import AllowedEmail, OAuthToken, User, UserLLMKey, UserPreferences
+from app.models.user import AllowedEmail, OAuthToken, User, UserLLMKey, UserPreferences, UserServiceKey
 
 __all__ = [
     "AllowedEmail",
@@ -28,4 +28,5 @@ __all__ = [
     "UserCompanyBlock",
     "UserLLMKey",
     "UserPreferences",
+    "UserServiceKey",
 ]

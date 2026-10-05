@@ -37,8 +37,9 @@ from app.core.config import get_settings
 from app.core.db import get_sessionmaker
 from app.core.redis import get_redis
 from app.models import Base, User
+from app.services.contacts.fake import FakeContactProvider
 from app.services.llm.fake import FakeLLMClient
-from app.services.registry import get_llm_client
+from app.services.registry import get_contact_provider_factory, get_llm_client
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -125,3 +126,28 @@ async def other_user_headers(session: AsyncSession) -> dict[str, str]:
     session.add(user)
     await session.commit()
     return {"Authorization": f"Bearer {create_session_token(user.id)}"}
+
+
+@pytest.fixture
+def fake_contacts() -> Iterator[FakeContactProvider]:
+    """A fresh fake Hunter for every request made through `client` (keys starting "rejected" fail)."""
+    from app.main import app
+
+    fake = FakeContactProvider()
+
+    def factory(key: str) -> FakeContactProvider:
+        fake.rejected = key.startswith("rejected")
+        return fake
+
+    app.dependency_overrides[get_contact_provider_factory] = lambda: factory
+    yield fake
+    app.dependency_overrides.pop(get_contact_provider_factory, None)
+
+
+@pytest.fixture
+async def with_hunter_key(auth_client: AsyncClient, fake_contacts: FakeContactProvider) -> AsyncClient:
+    """Logged-in client whose user has saved a (fake-verified) Hunter key."""
+    response = await auth_client.put("/settings/hunter-key", json={"api_key": "hunter-test-key-123"})
+    assert response.status_code == 200, response.text
+    fake_contacts.calls.clear()
+    return auth_client

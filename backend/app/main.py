@@ -4,7 +4,18 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import admin, auth, companies, health, jobs, matches, preferences, resume, settings
+from app.api.routes import (
+    admin,
+    auth,
+    companies,
+    health,
+    jobs,
+    matches,
+    outreach,
+    preferences,
+    resume,
+    settings,
+)
 from app.core.config import get_settings
 from app.core.db import get_engine
 from app.core.logging import configure_logging
@@ -37,6 +48,7 @@ def create_app() -> FastAPI:
     app.include_router(jobs.router)
     app.include_router(matches.router)
     app.include_router(companies.router)
+    app.include_router(outreach.router)
     app.include_router(admin.router)
     return app
 

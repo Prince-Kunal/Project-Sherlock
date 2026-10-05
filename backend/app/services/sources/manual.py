@@ -19,10 +19,14 @@ from app.services.llm.redaction import redact_pii
 from app.services.sources.ashby import AshbySource
 from app.services.sources.base import JobIn, MalformedJobError
 from app.services.sources.greenhouse import GreenhouseSource
-from app.services.sources.hn import company_domain_from_url
 from app.services.sources.http import PoliteHttpClient
 from app.services.sources.lever import LeverSource
-from app.services.sources.text import detect_employment_type, detect_remote, html_to_text
+from app.services.sources.text import (
+    company_domain_from_url,
+    detect_employment_type,
+    detect_remote,
+    html_to_text,
+)
 
 _GREENHOUSE_RE = re.compile(r"^(?:job-boards(?:\.eu)?|boards(?:\.eu)?)\.greenhouse\.io$")
 _UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"

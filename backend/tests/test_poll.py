@@ -183,3 +183,22 @@ async def test_real_seed_file_is_valid(session: AsyncSession) -> None:
     assert 50 <= rows <= 100
     tokens = (await session.execute(select(Company.ats_type, Company.ats_token))).all()
     assert all(ats in {AtsType.GREENHOUSE, AtsType.LEVER, AtsType.ASHBY} and token for ats, token in tokens)
+
+
+async def test_jobs_keep_their_hash_when_the_company_later_gets_a_domain(session: AsyncSession) -> None:
+    """Contact discovery may fill in an Adzuna company's domain; its jobs must not be duplicated."""
+    from datetime import UTC, datetime
+
+    from app.services.jobs.ingest import upsert_jobs
+    from app.services.sources.base import JobIn
+
+    company = Company(name="Example Labs")
+    session.add(company)
+    await session.flush()
+    job = JobIn(source=JobSourceType.ADZUNA, external_id="1", company_name="Example Labs", title="SDE Intern")
+    first = await upsert_jobs(session, company, [job], datetime.now(UTC))
+    company.domain = "examplelabs.com"
+    second = await upsert_jobs(session, company, [job], datetime.now(UTC))
+    await session.commit()
+    assert (first.created, second.created, second.updated) == (1, 0, 1)
+    assert await _count_jobs(session) == 1

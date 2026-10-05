@@ -5,6 +5,7 @@ import html
 import re
 import unicodedata
 from typing import Literal
+from urllib.parse import urlparse
 
 EmploymentType = Literal["internship", "full_time", "part_time", "contract"]
 
@@ -141,3 +142,37 @@ def dedupe_hash(company_domain: str | None, company_name: str, title: str, locat
     company = normalize_domain(company_domain) or normalize_key(company_name)
     material = "|".join([company, normalize_key(title), normalize_key(location)])
     return hashlib.sha256(material.encode()).hexdigest()
+
+
+# Job-board, ATS and link hosts: a job URL on these says nothing about the company's own domain.
+_NOT_COMPANY_HOSTS = (
+    "ycombinator.com",
+    "greenhouse.io",
+    "lever.co",
+    "ashbyhq.com",
+    "workable.com",
+    "wellfound.com",
+    "linkedin.com",
+    "notion.site",
+    "google.com",
+    "forms.gle",
+    "recruitee.com",
+    "bamboohr.com",
+    "smartrecruiters.com",
+    "myworkdayjobs.com",
+    "adzuna.in",
+    "adzuna.com",
+    "github.com",
+    "bit.ly",
+)
+
+
+def company_domain_from_url(url: str | None) -> str | None:
+    """The company's own domain from a job or careers URL, or None for ATS/job-board hosts."""
+    host = (urlparse(url).hostname or "").lower() if url else ""
+    if not host or any(host == h or host.endswith("." + h) for h in _NOT_COMPANY_HOSTS):
+        return None
+    labels = host.removeprefix("www.").split(".")
+    if labels[0] in {"jobs", "careers", "apply", "boards"} and len(labels) > 2:
+        labels = labels[1:]
+    return ".".join(labels)

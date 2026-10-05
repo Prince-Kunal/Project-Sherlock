@@ -32,14 +32,24 @@ async def test_fake_embedder_is_deterministic_normalised_and_meaningful() -> Non
 
 async def test_fake_contact_provider() -> None:
     provider = FakeContactProvider()
-    people = await provider.search_people("acme.dev", ["recruiter"])
-    assert [p.title for p in people] == ["Technical Recruiter"]
+    result = await provider.search_people(domain="acme.dev")
+    assert result.domain == "acme.dev"
+    assert [p.email for p in result.people][:2] == ["asha@acme.dev", "vikram@acme.dev"]
+    by_name = await provider.search_people(company="Acme Robotics")
+    assert by_name.domain == "acmerobotics.example"
     email = await provider.find_email("acme.dev", "Neha", "Kapoor")
     assert email.email == "neha@acme.dev"
     assert await provider.verify("neha@acme.dev") == VerificationStatus.VALID
     assert await provider.verify("invalid.person@acme.dev") == VerificationStatus.INVALID
     assert await provider.verify("catchall@acme.dev") == VerificationStatus.ACCEPT_ALL
-    assert [c[0] for c in provider.calls] == ["search_people", "find_email", "verify", "verify", "verify"]
+    assert [c[0] for c in provider.calls] == [
+        "search_people",
+        "search_people",
+        "find_email",
+        "verify",
+        "verify",
+        "verify",
+    ]
 
 
 async def test_fake_gmail_send_reply_and_thread() -> None:

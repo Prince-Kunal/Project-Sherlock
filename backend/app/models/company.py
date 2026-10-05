@@ -54,6 +54,8 @@ class Company(TimestampedBase):
     website_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM))
     last_polled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Last people search at the contact provider: contacts are reused for 60 days (PLAN.md Phase 5).
+    contacts_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class UserCompanyBlock(UserOwnedBase):

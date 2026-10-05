@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.enums import JobMatchStatus
 from app.schemas.jobs import JobOut
+from app.schemas.outreach import OutreachOut
 
 MatchEmploymentType = Literal["internship", "full_time", "contract", "unknown"]
 
@@ -46,6 +47,7 @@ class MatchOut(BaseModel):
     reasoning: str
     status: JobMatchStatus
     created_at: datetime
+    outreach: OutreachOut | None = None  # the latest outreach for this job, if any
 
 
 class ScoringStatus(BaseModel):

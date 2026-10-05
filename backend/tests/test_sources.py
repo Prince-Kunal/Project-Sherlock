@@ -18,9 +18,10 @@ from app.services.sources.adzuna import AdzunaNotConfiguredError, AdzunaSource
 from app.services.sources.ashby import AshbySource
 from app.services.sources.base import CompanyRef, JobQuery, MalformedJobError, RawJob
 from app.services.sources.greenhouse import GreenhouseSource
-from app.services.sources.hn import HNSource, company_domain_from_url
+from app.services.sources.hn import HNSource
 from app.services.sources.http import PoliteHttpClient
 from app.services.sources.lever import LeverSource
+from app.services.sources.text import company_domain_from_url
 from tests.conftest import FIXTURES, recorded
 
 SOURCES = FIXTURES / "sources"

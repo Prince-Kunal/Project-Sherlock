@@ -16,6 +16,8 @@ import type {
   Preferences,
   ResumeOut,
   ResumeVersion,
+  HunterKeyStatus,
+  Outreach,
   TailorPreview,
 } from "@/lib/types";
 
@@ -26,6 +28,7 @@ export const keys = {
   ats: (v: number | undefined) => ["resume", "ats", v] as const,
   preferences: ["preferences"] as const,
   llmKey: ["settings", "llm-key"] as const,
+  hunterKey: ["settings", "hunter-key"] as const,
 };
 
 /** Current resume, or null when the user hasn't uploaded one yet. */
@@ -235,5 +238,68 @@ export function useTailorPreview() {
       apiFetch<TailorPreview>(`/matches/${matchId}/tailor-preview`, {
         method: "POST",
       }),
+  });
+}
+
+export function useHunterKey() {
+  return useQuery({
+    queryKey: keys.hunterKey,
+    queryFn: () => apiFetch<HunterKeyStatus>("/settings/hunter-key"),
+  });
+}
+
+export function useSaveHunterKey() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (apiKey: string) =>
+      apiFetch<HunterKeyStatus>("/settings/hunter-key", {
+        method: "PUT",
+        body: JSON.stringify({ api_key: apiKey }),
+      }),
+    onSuccess: (status) => queryClient.setQueryData(keys.hunterKey, status),
+  });
+}
+
+export function useDeleteHunterKey() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<void>("/settings/hunter-key", { method: "DELETE" }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: keys.hunterKey }),
+  });
+}
+
+export function useFindContact() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (matchId: string) =>
+      apiFetch<Outreach>(`/matches/${matchId}/find-contact`, {
+        method: "POST",
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["matches"] });
+      void queryClient.invalidateQueries({ queryKey: keys.hunterKey });
+    },
+  });
+}
+
+export function useSetContact() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      outreachId,
+      ...body
+    }: {
+      outreachId: string;
+      email: string;
+      full_name?: string;
+      title?: string;
+    }) =>
+      apiFetch<Outreach>(`/outreach/${outreachId}/contact`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["matches"] }),
   });
 }

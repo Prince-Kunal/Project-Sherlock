@@ -54,12 +54,14 @@ class Settings(BaseSettings):
 
     hn_enabled: bool = True  # parse HN "Who is hiring" with the owner's key (needs GEMINI_API_KEY)
 
-    hunter_api_key: str = ""
+    hunter_api_key: str = ""  # owner's key; used for other users only if the fallback below is on
+    allow_owner_hunter_fallback: bool = False
     apollo_api_key: str = ""
     adzuna_app_id: str = ""
     adzuna_app_key: str = ""
 
     max_contact_lookups_per_user_month: int = 40
+    contact_cache_days: int = 60
     max_llm_usd_per_user_month: float = 5.0
 
     sentry_dsn: str = ""

@@ -12,7 +12,6 @@ import re
 from collections.abc import Awaitable
 from datetime import UTC, datetime
 from typing import Any, Literal, cast
-from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field
 from redis.asyncio import Redis
@@ -24,7 +23,7 @@ from app.services.llm.redaction import redact_pii
 from app.services.sources.base import CompanyRef, JobIn, JobQuery, JobSource, MalformedJobError, RawJob
 from app.services.sources.greenhouse import parse_datetime
 from app.services.sources.http import PoliteHttpClient
-from app.services.sources.text import html_to_text
+from app.services.sources.text import company_domain_from_url, html_to_text
 
 log = logging.getLogger(__name__)
 
@@ -32,20 +31,6 @@ ALGOLIA = "https://hn.algolia.com/api/v1"
 _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 _PROCESSED_TTL_SECONDS = 45 * 24 * 3600
 # Hosts that are job boards or HN itself, not the hiring company's own site.
-_NOT_COMPANY_HOSTS = (
-    "ycombinator.com",
-    "greenhouse.io",
-    "lever.co",
-    "ashbyhq.com",
-    "workable.com",
-    "wellfound.com",
-    "linkedin.com",
-    "notion.site",
-    "google.com",
-    "forms.gle",
-    "recruitee.com",
-    "bamboohr.com",
-)
 DEFAULT_KEYWORDS = ["remote", "india", "bengaluru", "bangalore", "anywhere", "worldwide", "global", "intern"]
 
 
@@ -57,16 +42,6 @@ class HNJob(BaseModel):
     remote: bool | None = None
     employment_type: Literal["internship", "full_time", "part_time", "contract"] | None = None
     url: str | None = None
-
-
-def company_domain_from_url(url: str | None) -> str | None:
-    host = (urlparse(url).hostname or "").lower() if url else ""
-    if not host or any(host == h or host.endswith("." + h) for h in _NOT_COMPANY_HOSTS):
-        return None
-    labels = host.removeprefix("www.").split(".")
-    if labels[0] in {"jobs", "careers", "apply", "boards"} and len(labels) > 2:
-        labels = labels[1:]
-    return ".".join(labels)
 
 
 class HNSource(JobSource):

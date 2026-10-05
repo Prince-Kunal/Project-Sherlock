@@ -21,6 +21,7 @@ EXPECTED_TABLES = {
     "suppression_list",
     "oauth_tokens",
     "user_llm_keys",
+    "user_service_keys",  # Phase 5: each user's own Hunter key
     "usage_ledger",
 }
 
