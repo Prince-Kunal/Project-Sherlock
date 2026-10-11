@@ -101,7 +101,7 @@ def _anonymise_person(item: dict[str, Any], i: int, domain: str) -> dict[str, An
     """Real people's names and addresses never go into the repo: keep the shape, invent the person."""
     first, last = _FAKE_PEOPLE[i % len(_FAKE_PEOPLE)]
     item.update(first_name=first, last_name=last, value=f"{first.lower()}.{last.lower()}@{domain}")
-    for key in ("linkedin", "twitter", "phone_number"):
+    for key in ("linkedin", "linkedin_url", "twitter", "phone_number"):
         if key in item:
             item[key] = None
     item["sources"] = [
@@ -128,32 +128,30 @@ def record_hunter() -> None:
     ).json()
     if "errors" in search:
         raise SystemExit(f"Hunter error: {search['errors']}")
-    real_first = search["data"]["emails"][0]
+    real = dict(search["data"]["emails"][0])  # copy: anonymising edits the results in place
     search["data"]["emails"] = [
         _anonymise_person(e, i, domain) for i, e in enumerate(search["data"]["emails"])
     ]
-    save("hunter/domain_search.json", search)
 
     finder = c.get(
         f"{base}/email-finder",
-        params={
-            "domain": domain,
-            "first_name": real_first["first_name"],
-            "last_name": real_first["last_name"],
-        },
+        params={"domain": domain, "first_name": real["first_name"], "last_name": real["last_name"]},
     ).json()
     if "data" in finder:
         finder["data"] = _anonymise_person(
             {**finder["data"], "value": finder["data"].get("email")}, 0, domain
         )
         finder["data"]["email"] = finder["data"].pop("value")
-    save("hunter/email_finder.json", finder)
+        finder["meta"]["params"].update(first_name="Asha", last_name="Rao")
 
     verify = c.get(f"{base}/email-verifier", params={"email": f"careers@{domain}"}).json()
-    save("hunter/email_verifier.json", verify)
     text = json.dumps([search, finder, verify])
-    if key in text or real_first.get("value", "\x00") in text:
-        raise SystemExit("a key or a real address leaked into the fixtures")
+    leaks = [key, real["value"], real["first_name"], real["last_name"]]
+    if any(s and s in text for s in leaks):
+        raise SystemExit("a key or a real person leaked into the fixtures; nothing saved")
+    save("hunter/domain_search.json", search)
+    save("hunter/email_finder.json", finder)
+    save("hunter/email_verifier.json", verify)
     account = c.get(f"{base}/account").json()["data"]["requests"]
     print("credits after recording:", account)
 

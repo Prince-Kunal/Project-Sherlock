@@ -4,6 +4,7 @@ the Hunter adapter's error mapping, and the outreach state machine."""
 
 import json
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import httpx
 import pytest
@@ -315,6 +316,55 @@ async def test_hunter_restricted_account_is_an_auth_error_and_key_stays_out_of_t
     request = route.calls.last.request
     assert request.headers["X-API-KEY"] == "secret-key"
     assert "secret-key" not in str(request.url)
+
+
+def _hunter_fixture(name: str) -> dict[str, Any]:
+    return json.loads((FIXTURES / "sources" / "hunter" / name).read_text())
+
+
+@respx.mock
+async def test_hunter_domain_search_parses_a_real_response() -> None:
+    route = respx.get("https://api.hunter.io/v2/domain-search").mock(
+        return_value=httpx.Response(200, json=_hunter_fixture("domain_search.json"))
+    )
+    result = await HunterProvider("k").search_people(domain="sarvam.ai")
+
+    params = route.calls.last.request.url.params
+    assert params["domain"] == "sarvam.ai"
+    assert "company" not in params
+    assert params["seniority"] == "senior,executive"
+    assert params["type"] == "personal"
+    assert (result.domain, result.organization) == ("sarvam.ai", "Sarvam")
+    assert result.headcount is None  # the real response carries no company size
+    assert len(result.people) == 7
+    first = result.people[0]
+    assert (first.full_name, first.email, first.title) == ("Asha Rao", "asha.rao@sarvam.ai", "Co-Founder")
+    assert (first.seniority, first.department, first.confidence) == ("executive", "executive", 99)
+    assert first.verification == VerificationStatus.VALID
+    assert first.verified_at == datetime(2026, 9, 13, tzinfo=UTC)
+    assert {categorize(p.title, p.seniority, p.department) for p in result.people} >= {
+        RoleCategory.FOUNDER,
+        RoleCategory.ENGINEER,
+        RoleCategory.RECRUITER,
+    }
+
+
+@respx.mock
+async def test_hunter_email_finder_and_verifier_parse_real_responses() -> None:
+    respx.get("https://api.hunter.io/v2/email-finder").mock(
+        return_value=httpx.Response(200, json=_hunter_fixture("email_finder.json"))
+    )
+    respx.get("https://api.hunter.io/v2/email-verifier").mock(
+        return_value=httpx.Response(200, json=_hunter_fixture("email_verifier.json"))
+    )
+    provider = HunterProvider("k")
+    found = await provider.find_email("sarvam.ai", "Asha", "Rao")
+    assert (found.email, found.confidence, found.verification) == (
+        "asha.rao@sarvam.ai",
+        95,
+        VerificationStatus.VALID,
+    )
+    assert await provider.verify("careers@sarvam.ai") == VerificationStatus.VALID
 
 
 @respx.mock

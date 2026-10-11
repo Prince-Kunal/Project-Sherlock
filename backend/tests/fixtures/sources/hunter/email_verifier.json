@@ -1,0 +1,64 @@
+{
+  "data": {
+    "status": "valid",
+    "score": 100,
+    "email": "careers@sarvam.ai",
+    "regexp": true,
+    "gibberish": false,
+    "disposable": false,
+    "webmail": false,
+    "mx_records": true,
+    "smtp_server": true,
+    "smtp_check": true,
+    "accept_all": false,
+    "block": false,
+    "verification": {
+      "date": "2026-10-09",
+      "status": "valid"
+    },
+    "sources": [
+      {
+        "domain": "shortlistapp.co",
+        "uri": "https://shortlistapp.co/job/motion-designer-at-sarvam-9f15eec1-96c9-440f-8baf-dcb8b3d55568",
+        "extracted_on": "2026-10-08",
+        "last_seen_on": "2026-10-08",
+        "still_on_page": true
+      },
+      {
+        "domain": "shortlistapp.co",
+        "uri": "https://shortlistapp.co/job/visual-designer-at-sarvam-597119b9-ccb6-4b6e-be0e-39eb185093d0",
+        "extracted_on": "2026-10-08",
+        "last_seen_on": "2026-10-08",
+        "still_on_page": true
+      },
+      {
+        "domain": "automationvault.net",
+        "uri": "https://automationvault.net/sarvam-ai-secures-41-million-funding-for-full-stack-generative-ai-development",
+        "extracted_on": "2026-06-06",
+        "last_seen_on": "2026-10-01",
+        "still_on_page": true
+      },
+      {
+        "domain": "techrashik.in",
+        "uri": "https://techrashik.in/sarvam-ai-complete-guide-hindi",
+        "extracted_on": "2026-07-22",
+        "last_seen_on": "2026-07-22",
+        "still_on_page": true
+      },
+      {
+        "domain": "sarvam.ai",
+        "uri": "https://sarvam.ai/old-home",
+        "extracted_on": "2026-01-14",
+        "last_seen_on": "2026-01-14",
+        "still_on_page": false
+      }
+    ],
+    "result": "deliverable",
+    "_deprecation_notice": "Using result is deprecated, use status instead"
+  },
+  "meta": {
+    "params": {
+      "email": "careers@sarvam.ai"
+    }
+  }
+}

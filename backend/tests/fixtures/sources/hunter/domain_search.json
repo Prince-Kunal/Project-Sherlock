@@ -1,0 +1,230 @@
+{
+  "data": {
+    "domain": "sarvam.ai",
+    "disposable": false,
+    "webmail": false,
+    "accept_all": false,
+    "pattern": "{first}",
+    "organization": "Sarvam",
+    "linked_domains": [],
+    "emails": [
+      {
+        "value": "asha.rao@sarvam.ai",
+        "type": "personal",
+        "source_type": "found",
+        "confidence": 99,
+        "sources": [
+          {
+            "domain": "sarvam.ai",
+            "uri": "https://sarvam.ai/",
+            "extracted_on": "2025-01-07",
+            "last_seen_on": "2026-08-27",
+            "still_on_page": true
+          }
+        ],
+        "first_name": "Asha",
+        "last_name": "Rao",
+        "position": "Co-Founder",
+        "position_raw": "Co-Founder",
+        "seniority": "executive",
+        "department": "executive",
+        "decision_maker": true,
+        "linkedin": null,
+        "twitter": null,
+        "phone_number": null,
+        "verification": {
+          "date": "2026-09-13",
+          "status": "valid"
+        }
+      },
+      {
+        "value": "vikram.iyer@sarvam.ai",
+        "type": "personal",
+        "source_type": "found",
+        "confidence": 99,
+        "sources": [
+          {
+            "domain": "sarvam.ai",
+            "uri": "https://sarvam.ai/",
+            "extracted_on": "2026-09-04",
+            "last_seen_on": "2026-10-06",
+            "still_on_page": true
+          }
+        ],
+        "first_name": "Vikram",
+        "last_name": "Iyer",
+        "position": "Head of Strategy",
+        "position_raw": "Head of Strategy & GTM, Model APIs",
+        "seniority": "executive",
+        "department": "management",
+        "decision_maker": true,
+        "linkedin": null,
+        "twitter": null,
+        "phone_number": null,
+        "verification": {
+          "date": "2026-09-26",
+          "status": "valid"
+        }
+      },
+      {
+        "value": "neha.kapoor@sarvam.ai",
+        "type": "personal",
+        "source_type": "found",
+        "confidence": 96,
+        "sources": [
+          {
+            "domain": "sarvam.ai",
+            "uri": "https://sarvam.ai/",
+            "extracted_on": "2026-08-25",
+            "last_seen_on": "2026-08-25",
+            "still_on_page": true
+          }
+        ],
+        "first_name": "Neha",
+        "last_name": "Kapoor",
+        "position": "Co-Founder",
+        "position_raw": "Co-Founder",
+        "seniority": "executive",
+        "department": "executive",
+        "decision_maker": true,
+        "linkedin": null,
+        "twitter": null,
+        "phone_number": null,
+        "verification": {
+          "date": "2026-10-08",
+          "status": "valid"
+        }
+      },
+      {
+        "value": "rahul.menon@sarvam.ai",
+        "type": "personal",
+        "source_type": "found",
+        "confidence": 95,
+        "sources": [
+          {
+            "domain": "sarvam.ai",
+            "uri": "https://sarvam.ai/",
+            "extracted_on": "2025-10-02",
+            "last_seen_on": "2026-08-25",
+            "still_on_page": true
+          }
+        ],
+        "first_name": "Rahul",
+        "last_name": "Menon",
+        "position": "Founder",
+        "position_raw": "Founding Member",
+        "seniority": "executive",
+        "department": "executive",
+        "decision_maker": true,
+        "linkedin": null,
+        "twitter": null,
+        "phone_number": null,
+        "verification": {
+          "date": "2026-10-08",
+          "status": "valid"
+        }
+      },
+      {
+        "value": "divya.shah@sarvam.ai",
+        "type": "personal",
+        "source_type": "generated",
+        "confidence": 95,
+        "sources": [
+          {
+            "domain": "sarvam.ai",
+            "uri": "https://sarvam.ai/",
+            "extracted_on": "2026-02-24",
+            "last_seen_on": "2026-08-23",
+            "still_on_page": true
+          }
+        ],
+        "first_name": "Divya",
+        "last_name": "Shah",
+        "position": "Senior Machine Learning Engineer",
+        "position_raw": "Senior Machine Learning Engineer",
+        "seniority": "senior",
+        "department": "it",
+        "decision_maker": false,
+        "linkedin": null,
+        "twitter": null,
+        "phone_number": null,
+        "verification": {
+          "date": "2026-09-13",
+          "status": "valid"
+        }
+      },
+      {
+        "value": "arjun.pillai@sarvam.ai",
+        "type": "personal",
+        "source_type": "generated",
+        "confidence": 95,
+        "sources": [
+          {
+            "domain": "sarvam.ai",
+            "uri": "https://sarvam.ai/",
+            "extracted_on": "2026-08-11",
+            "last_seen_on": "2026-08-24",
+            "still_on_page": true
+          }
+        ],
+        "first_name": "Arjun",
+        "last_name": "Pillai",
+        "position": "GTM Lead",
+        "position_raw": "GTM Lead Public Sector",
+        "seniority": "senior",
+        "department": "management",
+        "decision_maker": false,
+        "linkedin": null,
+        "twitter": null,
+        "phone_number": null,
+        "verification": {
+          "date": "2026-09-15",
+          "status": "valid"
+        }
+      },
+      {
+        "value": "kavya.reddy@sarvam.ai",
+        "type": "personal",
+        "source_type": "generated",
+        "confidence": 95,
+        "sources": [
+          {
+            "domain": "sarvam.ai",
+            "uri": "https://sarvam.ai/",
+            "extracted_on": "2025-10-10",
+            "last_seen_on": "2026-09-01",
+            "still_on_page": true
+          }
+        ],
+        "first_name": "Kavya",
+        "last_name": "Reddy",
+        "position": "Senior Talent Acquisition Specialist",
+        "position_raw": "Senior HR and Talent Acquisition Specialist",
+        "seniority": "senior",
+        "department": "hr",
+        "decision_maker": false,
+        "linkedin": null,
+        "twitter": null,
+        "phone_number": null,
+        "verification": {
+          "date": "2026-09-30",
+          "status": "valid"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "results": 7,
+    "results_approximate": false,
+    "limit": 10,
+    "offset": 0,
+    "params": {
+      "domain": "sarvam.ai",
+      "company": null,
+      "type": "personal",
+      "seniority": "senior,executive",
+      "department": "executive,it,management,hr",
+      "decision_maker": null
+    }
+  }
+}
