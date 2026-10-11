@@ -76,19 +76,19 @@ _INPUTS_BLOCK_RE = re.compile(r"## Inputs\n```json\n(.*?)\n```", re.DOTALL)
 
 
 def _fake_email_draft(prompt: str) -> dict[str, Any]:
-    """USE_FAKES answer for prompts/draft_email.md: a plain draft hooked on the first context sentence."""
+    """USE_FAKES answer for prompts/draft_email.md: a short plain draft (it never quotes its source)."""
     match = _INPUTS_BLOCK_RE.search(prompt)
     inputs: dict[str, Any] = json.loads(match.group(1)) if match else {}
     job = inputs.get("job", {})
-    source = (inputs.get("context_sentences") or [job.get("title", "this role")])[0]
-    highlight = next(iter(inputs.get("highlights") or []), None)
-    fit = f" Most relevant from my side: {highlight.rstrip('.')}." if highlight else ""
+    title = job.get("title") or "this role"
+    source = (inputs.get("context_sentences") or [title])[0]
     return {
-        "subject": f"{job.get('title', 'Your opening')}: referral request"[:70],
+        "subject": f"{title} at {job.get('company', 'your team')}"[:70],
         "body": (
-            f"I came across the {job.get('title')} opening at {job.get('company')}, and this line stood "
-            f"out: {source}{fit}\n\nWould you be open to referring me, or pointing me to the right "
-            "person? My resume is attached. (Sample draft from the fake LLM, USE_FAKES=true.)"
+            f"I'm applying for the {title} role and wanted to ask if you'd refer me. The projects at the "
+            "top of my resume are the closest to what the team does.\n\nIf you're not the right person, "
+            "a pointer to whoever's hiring would help. Resume's attached. (Sample draft from the fake "
+            "LLM, USE_FAKES=true.)"
         ),
         "personalization_source": source,
     }

@@ -1,7 +1,7 @@
 [
   {
-    "subject": "Backend Engineering Intern: referral request",
-    "body": "I noticed Ledgerline is looking to improve its CI pipeline for the Backend Engineering Intern role. As a third-year CS student who enjoys building backend services, I recently built a 90-question evaluation suite run in CI that blocks merges which reduce accuracy, and exposed the parser as a REST API.\n\nWould you be open to referring me for the position, or pointing me to the right person? My resume is attached.",
+    "subject": "Backend Engineering Intern role at Ledgerline",
+    "body": "I recently built a parser and served it over a REST API, and set up a 90-question CI test suite that stops merges if accuracy falls. Would you be open to referring me for the Backend Engineering Intern role at Ledgerline? If someone else is handling this hire, a quick pointer to them would help a lot. My resume is attached.",
     "personalization_source": "Containerise services with Docker and help improve our CI pipeline."
   }
 ]

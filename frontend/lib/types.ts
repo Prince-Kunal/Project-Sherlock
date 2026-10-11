@@ -258,6 +258,8 @@ export type OutreachDetail = OutreachListItem & {
   keyword_coverage: AtsReport["keyword_coverage"];
   ats: AtsReport | null;
   approved_at: string | null;
+  /** Phrasing that may read as machine-written (backend services/email/style.py). */
+  style_warnings: string[];
 };
 
 export type ReviewStats = {

@@ -1,6 +1,7 @@
 """Phase 6: the draft validator, the drafter's retry, the daily pipeline (match → contact → tailor →
 draft → pending_review) end to end on fakes, and the review API (edit, regenerate, approve, skip)."""
 
+import re
 import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
@@ -28,13 +29,14 @@ from app.schemas.outreach import EmailDraft
 from app.schemas.resume import Basics, Link
 from app.services.contacts.fake import FakeContactProvider
 from app.services.email.drafter import (
-    OPT_OUT_LINE,
+    OPT_OUT_LINES,
     Drafter,
     DraftError,
     DraftInputs,
     check_text,
     compose_body,
     key_sentences,
+    opt_out_line,
     replace_greeting,
     validate_draft,
 )
@@ -68,7 +70,7 @@ def _contact(name: str = "Priya Nair", email: str = "priya@ledgerline.example") 
 
 def _draft(**overrides: Any) -> EmailDraft:
     data: dict[str, Any] = {
-        "subject": "Backend Engineering Intern: referral request",
+        "subject": "Backend intern role at Ledgerline",
         "body": (
             "I saw the Backend Engineering Intern role and the focus on Python APIs over PostgreSQL is "
             "close to what I've built. I built a Django REST backend on PostgreSQL for a college project.\n\n"
@@ -77,6 +79,10 @@ def _draft(**overrides: Any) -> EmailDraft:
         "personalization_source": CONTEXT[0],
     }
     return EmailDraft(**{**data, **overrides})
+
+
+def _without_opt_out(body: str) -> str:
+    return "\n".join(line for line in body.splitlines() if line not in OPT_OUT_LINES)
 
 
 def _issues(draft: EmailDraft) -> set[str]:
@@ -91,8 +97,19 @@ def test_a_good_draft_passes_and_is_composed_with_greeting_opt_out_and_signature
     assert _issues(draft) == set()
     body = compose_body(draft, _contact(), BASICS)
     assert body.startswith("Hi Priya,\n\n")
-    assert OPT_OUT_LINE in body
-    assert body.endswith("Best,\nRohan Das\ngithub.com/rohandas | linkedin.com/in/rohandas")
+    assert opt_out_line(_contact()) in body
+    assert re.search(
+        r"\n\n(Thanks|Best|Cheers),\nRohan Das\ngithub.com/rohandas \| linkedin.com/in/rohandas$", body
+    )
+
+
+def test_opt_out_line_and_sign_off_vary_by_contact_but_are_stable() -> None:
+    contacts = [_contact(email=f"person{i}@ledgerline.example") for i in range(12)]
+    bodies = [compose_body(_draft(), c, BASICS) for c in contacts]
+    assert len({opt_out_line(c) for c in contacts}) > 1
+    assert all(opt_out_line(c) in b for c, b in zip(contacts, bodies, strict=True))
+    assert compose_body(_draft(), contacts[0], BASICS) == bodies[0]  # same contact, same email
+    assert all(check_text("s", b, max_words=150) == [] for b in bodies)  # every variant is an opt-out
 
 
 def test_missing_opt_out_is_rejected() -> None:
@@ -171,7 +188,7 @@ async def test_drafter_retries_once_with_the_issues_then_succeeds() -> None:
     bad = _draft(personalization_source="Something the JD never said at all.").model_dump()
     llm = FakeLLMClient(responses={"draft_email": [bad, _draft().model_dump()]})
     result = await Drafter(llm).draft(_inputs(), None)
-    assert result.subject == "Backend Engineering Intern: referral request"
+    assert result.subject == "Backend intern role at Ledgerline"
     assert result.body.startswith("Hi Priya,")
     prompts = [p for r, p in llm.calls if r.prompt_name == "draft_email"]
     assert len(prompts) == 2
@@ -241,8 +258,8 @@ async def test_build_daily_drafts_end_to_end_then_approve(
     draft = (await with_hunter_key.get(f"/outreach/{pending['items'][0]['id']}")).json()
     assert draft["status"] == "pending_review"
     assert draft["body"].startswith("Hi Asha,")
-    assert OPT_OUT_LINE in draft["body"]
-    assert draft["personalization_source"] in draft["body"]  # the fake quotes its source
+    assert set(draft["body"].splitlines()) & set(OPT_OUT_LINES)
+    assert draft["style_warnings"] == []
     assert draft["ats"]["passed"] is True
     assert draft["resume_filename"] == "Rohan_Das_Resume.pdf"
     assert draft["contact"]["full_name"] == "Asha Rao"
@@ -402,7 +419,7 @@ async def test_edit_keeps_the_original_in_the_event(
 
     # Removing the opt-out line is refused (invariant 9), and so are placeholders.
     no_opt_out = await with_hunter_key.patch(
-        f"/outreach/{drafted['id']}", json={"body": new_body.replace(OPT_OUT_LINE, "")}
+        f"/outreach/{drafted['id']}", json={"body": _without_opt_out(new_body)}
     )
     assert no_opt_out.status_code == 422
     assert no_opt_out.json()["detail"]["code"] == "draft_invalid"

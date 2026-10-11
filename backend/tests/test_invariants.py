@@ -15,7 +15,7 @@ from app.models import Company, Contact, Job, Outreach, OutreachEvent, User
 from app.models.enums import CampaignType, JobSourceType, OutreachEventType, OutreachStatus
 from app.schemas.outreach import EmailDraft
 from app.schemas.resume import Basics
-from app.services.email.drafter import MAX_EDIT_WORDS, OPT_OUT_LINE, check_text, compose_body
+from app.services.email.drafter import MAX_EDIT_WORDS, OPT_OUT_LINE, OPT_OUT_LINES, check_text, compose_body
 from app.services.resume.files import save_tailored_pdf
 
 
@@ -145,9 +145,9 @@ def test_drafts_always_get_the_opt_out_line_and_edits_cannot_drop_it() -> None:
         subject="Referral", body="Would you refer me? Resume attached.", personalization_source="x"
     )
     body = compose_body(draft, Contact(full_name="Priya Nair", email="p@x.example"), Basics(name="A B"))
-    assert OPT_OUT_LINE in body
+    [line] = [line for line in body.splitlines() if line in OPT_OUT_LINES]
     assert check_text("Referral", body, max_words=MAX_EDIT_WORDS) == []
-    issues = check_text("Referral", body.replace(OPT_OUT_LINE, ""), max_words=MAX_EDIT_WORDS)
+    issues = check_text("Referral", body.replace(line, ""), max_words=MAX_EDIT_WORDS)
     assert [i.code for i in issues] == ["no_opt_out"]
 
 

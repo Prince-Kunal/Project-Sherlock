@@ -10,7 +10,9 @@ from app.models import Company, Contact, Job, JobMatch, Outreach, OutreachEvent
 from app.models.enums import OutreachEventType, OutreachStatus
 from app.schemas.jobs import CompanyBrief, JobOut
 from app.schemas.outreach import ContactOut, OutreachDetail, OutreachListItem, OutreachOut
+from app.schemas.resume import MasterResume
 from app.schemas.tailor import ResumeChange
+from app.services.email.style import style_issues
 from app.services.resume.ats_check import AtsReport, KeywordCoverage
 
 
@@ -105,4 +107,15 @@ async def outreach_detail(session: AsyncSession, outreach: Outreach) -> Outreach
         ),
         ats=AtsReport.model_validate(record["ats"]) if record.get("ats") else None,
         approved_at=approved,
+        style_warnings=_style_warnings(outreach, job),
     )
+
+
+def _style_warnings(outreach: Outreach, job: Job | None) -> list[str]:
+    if not outreach.body:
+        return []
+    bullets: list[str] = []
+    if (record := outreach.tailored_resume) and (resume := record.get("resume")):
+        bullets = [b.text for b in MasterResume.model_validate(resume).all_bullets()]
+    sources = [job.description_text if job else "", *bullets]
+    return [i.message for i in style_issues(outreach.subject or "", outreach.body, sources)]

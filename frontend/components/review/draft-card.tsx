@@ -271,6 +271,19 @@ function EmailView({ draft }: { draft: OutreachDetail }) {
       <div className="bg-background rounded-lg border p-3 text-sm leading-relaxed whitespace-pre-wrap">
         {draft.body}
       </div>
+      {draft.style_warnings.length > 0 && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+          <p className="flex items-center gap-1.5 font-medium">
+            <AlertTriangle className="size-4" /> Might read as machine-written
+          </p>
+          <ul className="mt-1 list-disc pl-5">
+            {draft.style_warnings.map((w) => (
+              <li key={w}>{w}</li>
+            ))}
+          </ul>
+          <p className="mt-1 text-xs">Edit it, or regenerate with a hint.</p>
+        </div>
+      )}
       {draft.personalization_source && (
         <p className="text-muted-foreground text-xs">
           Hook based on: “{draft.personalization_source}”

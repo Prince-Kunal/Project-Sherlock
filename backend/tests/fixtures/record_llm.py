@@ -177,7 +177,12 @@ async def record_draft() -> None:
         out.write_text(json.dumps([d.model_dump() for d in client.drafts], indent=2) + "\n")
         contexts = drafter.contexts(inputs)
         for i, d in enumerate(client.drafts, 1):
-            issues = validate_draft(d, contexts, compose_body(d, inputs.contact, inputs.basics))
+            issues = validate_draft(
+                d,
+                contexts,
+                compose_body(d, inputs.contact, inputs.basics),
+                [inputs.job.description_text, *inputs.highlights],
+            )
             print(f"attempt {i}: issues={[x.code for x in issues]}")
         print(f"recorded {out.relative_to(FIXTURES)} ({len(client.drafts)} attempts)")
 

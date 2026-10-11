@@ -31,6 +31,8 @@ DraftIssueCode = Literal[
     "unknown_source",
     "no_attachment_mention",
     "greeting_or_signoff",
+    "sounds_generated",
+    "copied_text",
 ]
 
 
@@ -93,6 +95,7 @@ class OutreachDetail(OutreachListItem):
     keyword_coverage: KeywordCoverage | None
     ats: AtsReport | None
     approved_at: datetime | None
+    style_warnings: list[str]  # machine-sounding phrasing in the current text (services/email/style.py)
 
 
 class OutreachList(BaseModel):

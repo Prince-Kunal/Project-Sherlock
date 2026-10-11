@@ -6,6 +6,7 @@ signature (name + links) are added here, so the user's personal details never re
 and every email carries an opt-out line (invariant 9).
 """
 
+import hashlib
 import json
 import logging
 import re
@@ -16,6 +17,7 @@ from app.models import Company, Contact, Job
 from app.models.enums import RoleCategory
 from app.schemas.outreach import DraftIssue, EmailDraft
 from app.schemas.resume import Basics
+from app.services.email.style import style_issues
 from app.services.llm.client import LLMClient
 from app.services.llm.prompt_loader import load_prompt
 from app.services.llm.redaction import redact_pii
@@ -28,10 +30,20 @@ MAX_EDIT_WORDS = 200  # a little slack for the user's own edits
 MAX_SUBJECT = 70
 MAX_CONTEXT_SENTENCES = 3
 OPT_OUT_LINE = "If this isn't something you can help with, just let me know and I won't follow up."
+# The parts added in code vary per contact, so two emails from Sherlock don't end identically.
+OPT_OUT_LINES = [
+    OPT_OUT_LINE,
+    "No worries if this isn't your area. Just tell me and I won't follow up.",
+    "If now isn't a good time or it's not something you can do, say so and I won't follow up.",
+    "And if you'd rather not, that's completely fine. Just reply and I'll leave it there.",
+    "If it's not something you can help with, a one-line reply is enough and I won't follow up.",
+]
+SIGN_OFFS = ["Thanks,", "Best,", "Cheers,"]
 # Edits may reword the opt-out line, but some opt-out must remain (invariant 9).
 _OPT_OUT_RE = re.compile(
     r"won'?t (?:follow up|email you again|contact you again|reach out again)|unsubscribe|"
-    r"(?:don'?t|not) (?:want|wish) to hear from me|let me know (?:and|if) I'?ll stop",
+    r"(?:don'?t|not) (?:want|wish) to hear from me|let me know (?:and|if) I'?ll stop|"
+    r"I'?ll leave it (?:there|at that)",
     re.IGNORECASE,
 )
 _PLACEHOLDER_RE = re.compile(
@@ -46,20 +58,11 @@ _BULLET_PREFIX_RE = re.compile(r"^\s*(?:[-*•·]|\d+[.)])\s*")
 _WORD_RE = re.compile(r"[\w'\u2019-]+")
 
 ROLE_TONE: dict[RoleCategory, str] = {
-    RoleCategory.FOUNDER: (
-        "a founder: be brief and direct, show genuine interest in what the company is building"
-    ),
-    RoleCategory.ENG_MANAGER: (
-        "an engineering lead: lead with the most relevant technical work and keep it concrete"
-    ),
-    RoleCategory.ENGINEER: (
-        "an engineer: be peer-to-peer and specific about the tech; ask if they'd refer or point you "
-        "to the right person"
-    ),
-    RoleCategory.RECRUITER: (
-        "a recruiter: be clear about the role and your fit; ask how best to be considered"
-    ),
-    RoleCategory.OTHER: "someone at the company: be polite and ask them to point you to the right person",
+    RoleCategory.FOUNDER: "a founder: keep it very short and direct, they read a lot of these",
+    RoleCategory.ENG_MANAGER: "an engineering lead: open with your most relevant technical work, briefly",
+    RoleCategory.ENGINEER: "an engineer: peer to peer, specific about the tech, no formality",
+    RoleCategory.RECRUITER: "a recruiter: name the role, say plainly why you fit, ask how best to apply",
+    RoleCategory.OTHER: "someone who may not be hiring: ask them to point you to the right person",
 }
 
 
@@ -137,8 +140,20 @@ def signature(basics: Basics) -> str:
     return "\n".join(lines)
 
 
+def _pick(options: list[str], key: str) -> str:
+    return options[int(hashlib.sha256(key.encode()).hexdigest(), 16) % len(options)]
+
+
+def opt_out_line(contact: Contact) -> str:
+    return _pick(OPT_OUT_LINES, "opt-out:" + contact.email.lower())
+
+
 def compose_body(draft: EmailDraft, contact: Contact, basics: Basics) -> str:
-    return f"{greeting_for(contact)}\n\n{draft.body.strip()}\n\n{OPT_OUT_LINE}\n\nBest,\n{signature(basics)}"
+    sign_off = _pick(SIGN_OFFS, "sign-off:" + contact.email.lower())
+    return (
+        f"{greeting_for(contact)}\n\n{draft.body.strip()}\n\n{opt_out_line(contact)}\n\n"
+        f"{sign_off}\n{signature(basics)}"
+    )
 
 
 def check_text(subject: str, body: str, *, max_words: int) -> list[DraftIssue]:
@@ -174,10 +189,17 @@ def _without_signature(body: str) -> str:
     return _SIGNOFF_RE.sub("", body)
 
 
-def validate_draft(draft: EmailDraft, contexts: list[str], composed: str) -> list[DraftIssue]:
-    """PLAN.md Phase 6 draft validator: length, subject, opt-out, placeholders, and a personalisation
-    source that is really one of the supplied sentences (a substring check)."""
+STYLE_CODES = {"sounds_generated", "copied_text"}
+
+
+def validate_draft(
+    draft: EmailDraft, contexts: list[str], composed: str, sources: list[str] | None = None
+) -> list[DraftIssue]:
+    """PLAN.md Phase 6 draft validator: length, subject, opt-out, placeholders, a personalisation
+    source that is really one of the supplied sentences (a substring check), and no machine-sounding
+    phrasing or text copied from `sources` (the job description and resume bullets)."""
     issues = check_text(draft.subject, composed, max_words=MAX_WORDS)
+    issues += style_issues(draft.subject, draft.body, sources or [])
     source = _normalize(draft.personalization_source)
     if len(source) < 15 or not any(source in _normalize(c) for c in contexts):
         issues.append(
@@ -219,6 +241,7 @@ class DraftResult:
     body: str
     personalization_source: str
     contexts: list[str]
+    style_warnings: list[str]  # phrasing still flagged after the retry; shown on the review card
 
 
 def _feedback(issues: list[DraftIssue], previous: EmailDraft) -> str:
@@ -259,9 +282,12 @@ class Drafter:
         }
 
     async def draft(self, inputs: DraftInputs, api_key: str | None) -> DraftResult:
-        """A draft that passes the validator, with one retry carrying the issues found."""
+        """A draft that passes the validator, with one retry carrying the issues found. If only
+        phrasing issues remain after the retry, the draft is kept with them as warnings (the user
+        reviews every email anyway, and a failed draft would waste the tailoring already done)."""
         contexts = self.contexts(inputs) or [inputs.job.title]
         variables = self.variables(inputs, contexts)
+        sources = [inputs.job.description_text, *inputs.highlights]
         feedback = "(none)"
         issues: list[DraftIssue] = []
         for attempt in (1, 2):
@@ -270,13 +296,14 @@ class Drafter:
             )
             draft = await self._llm.generate(request, EmailDraft)
             composed = compose_body(draft, inputs.contact, inputs.basics)
-            issues = validate_draft(draft, contexts, composed)
-            if not issues:
+            issues = validate_draft(draft, contexts, composed, sources)
+            if not issues or (attempt == 2 and all(i.code in STYLE_CODES for i in issues)):
                 return DraftResult(
                     subject=draft.subject.strip(),
                     body=composed,
                     personalization_source=draft.personalization_source.strip(),
                     contexts=contexts,
+                    style_warnings=[i.message for i in issues],
                 )
             log.info("draft attempt %d rejected: %s", attempt, [i.code for i in issues])
             feedback = _feedback(issues, draft)
