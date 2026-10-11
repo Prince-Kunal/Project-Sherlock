@@ -220,3 +220,52 @@ export type TailorPreview = {
   ats: AtsReport;
   bullets_dropped_to_fit: number;
 };
+
+export type OutreachStatus =
+  | "drafting"
+  | "pending_review"
+  | "approved"
+  | "scheduled"
+  | "sent"
+  | "replied"
+  | "followup_due"
+  | "send_failed"
+  | "skipped"
+  | "failed"
+  | "closed";
+
+/** A row in the review queue (mirrors backend OutreachListItem). */
+export type OutreachListItem = Outreach & {
+  subject: string | null;
+  job_title: string | null;
+  fit_score: number | null;
+  updated_at: string;
+};
+
+export type OutreachList = { items: OutreachListItem[]; total: number };
+
+/** Everything the review card shows (mirrors backend OutreachDetail). */
+export type OutreachDetail = OutreachListItem & {
+  body: string | null;
+  personalization_source: string | null;
+  match_id: string | null;
+  job: Job | null;
+  matched_skills: string[];
+  missing_skills: string[];
+  resume_pdf_url: string | null;
+  resume_filename: string | null;
+  resume_diff: ResumeChange[];
+  keyword_coverage: AtsReport["keyword_coverage"];
+  ats: AtsReport | null;
+  approved_at: string | null;
+};
+
+export type ReviewStats = {
+  pending_review: number;
+  new_matches: number;
+  sent_this_week: number;
+  daily_send_cap: number;
+  replies: number;
+  followups_due: number;
+  failed: number;
+};

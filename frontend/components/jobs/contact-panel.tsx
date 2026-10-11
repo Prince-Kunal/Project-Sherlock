@@ -10,7 +10,7 @@ import { errorMessage } from "@/lib/api";
 import { useFindContact, useSetContact } from "@/lib/queries";
 import type { Contact, Match, Outreach } from "@/lib/types";
 
-const ROLE_LABELS: Record<Contact["role_category"], string> = {
+export const ROLE_LABELS: Record<Contact["role_category"], string> = {
   founder: "Founder",
   eng_manager: "Engineering lead",
   engineer: "Engineer",
@@ -18,7 +18,7 @@ const ROLE_LABELS: Record<Contact["role_category"], string> = {
   other: "Contact",
 };
 
-const FAILURE_LABELS: Record<string, string> = {
+export const FAILURE_LABELS: Record<string, string> = {
   no_contact: "No suitable contact found",
   contact_key_required: "Add your Hunter key to look up contacts",
   contact_quota: "Your Hunter credits for this month are used up",
@@ -138,7 +138,7 @@ function OutreachContact({ outreach }: { outreach: Outreach }) {
   );
 }
 
-function ManualContactForm({
+export function ManualContactForm({
   outreachId,
   onDone,
 }: {

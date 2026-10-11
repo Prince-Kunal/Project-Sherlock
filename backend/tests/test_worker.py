@@ -13,3 +13,11 @@ def test_worker_registers_matching_tasks() -> None:
     assert {"poll_sources", "embed_new_jobs", "match_jobs_for_users"} <= names
     expire = next(j for j in WorkerSettings.cron_jobs if j.name == "expire_matches")
     assert expire.hour == {1}
+
+
+def test_worker_runs_build_daily_drafts_hourly() -> None:
+    names = {getattr(f, "__name__", None) or f.name for f in WorkerSettings.functions}
+    assert "build_daily_drafts" in names
+    job = next(j for j in WorkerSettings.cron_jobs if j.name == "cron:build_daily_drafts")
+    assert job.hour is None  # every hour: each user's batch runs when it's 07:00 for them
+    assert job.minute == {2}

@@ -72,6 +72,28 @@ def _fake_tailor_plan(prompt: str) -> dict[str, Any]:
     }
 
 
+_INPUTS_BLOCK_RE = re.compile(r"## Inputs\n```json\n(.*?)\n```", re.DOTALL)
+
+
+def _fake_email_draft(prompt: str) -> dict[str, Any]:
+    """USE_FAKES answer for prompts/draft_email.md: a plain draft hooked on the first context sentence."""
+    match = _INPUTS_BLOCK_RE.search(prompt)
+    inputs: dict[str, Any] = json.loads(match.group(1)) if match else {}
+    job = inputs.get("job", {})
+    source = (inputs.get("context_sentences") or [job.get("title", "this role")])[0]
+    highlight = next(iter(inputs.get("highlights") or []), None)
+    fit = f" Most relevant from my side: {highlight.rstrip('.')}." if highlight else ""
+    return {
+        "subject": f"{job.get('title', 'Your opening')}: referral request"[:70],
+        "body": (
+            f"I came across the {job.get('title')} opening at {job.get('company')}, and this line stood "
+            f"out: {source}{fit}\n\nWould you be open to referring me, or pointing me to the right "
+            "person? My resume is attached. (Sample draft from the fake LLM, USE_FAKES=true.)"
+        ),
+        "personalization_source": source,
+    }
+
+
 def build_fake_llm_client() -> FakeLLMClient:
     """For USE_FAKES=true local runs: canned answers so the UI works without an API key."""
     client = FakeLLMClient()
@@ -79,6 +101,7 @@ def build_fake_llm_client() -> FakeLLMClient:
         client.add_response(path.stem, json.loads(path.read_text()))
     client.add_responder("match", _fake_match_scores)
     client.add_responder("tailor", _fake_tailor_plan)
+    client.add_responder("draft_email", _fake_email_draft)
     return client
 
 

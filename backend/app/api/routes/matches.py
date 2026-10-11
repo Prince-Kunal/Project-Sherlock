@@ -11,14 +11,15 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import api_error, llm_errors
+from app.api.routes.outreach import run_pipeline
 from app.core.auth import CurrentUser
 from app.core.config import get_settings
 from app.core.db import get_session
 from app.models import Company, Job, JobMatch
-from app.models.enums import JobMatchStatus
+from app.models.enums import JobMatchStatus, OutreachStatus
 from app.schemas.jobs import JobOut
 from app.schemas.matches import MatchFeed, MatchOut, MatchStatusFilter, ScoringStatus
-from app.schemas.outreach import OutreachOut
+from app.schemas.outreach import OutreachDetail, OutreachOut
 from app.schemas.resume import MasterResume
 from app.schemas.tailor import TailorPreviewOut
 from app.services.contacts.service import (
@@ -28,7 +29,7 @@ from app.services.contacts.service import (
     find_contact_for,
     start_job_outreach,
 )
-from app.services.contacts.views import latest_outreach_by_job, outreach_out
+from app.services.contacts.views import latest_outreach_by_job, outreach_detail, outreach_out
 from app.services.llm.client import LLMClient
 from app.services.llm.user_keys import get_key_row, resolve_api_key
 from app.services.matching.filters import hard_filter_conditions
@@ -293,3 +294,34 @@ async def find_contact(
     await find_contact_for(session, outreach, job, company, finder, actor_id=user.id)
     await session.commit()
     return await outreach_out(session, outreach)
+
+
+# --- Manual pipeline (PLAN.md Phase 6) ------------------------------------------------------------
+
+
+@router.post("/{match_id}/draft", response_model=OutreachDetail)
+async def draft_now(
+    match_id: uuid.UUID,
+    user: CurrentUser,
+    session: Session,
+    llm: Annotated[LLMClient, Depends(get_llm_client)],
+    factory: Annotated[ProviderFactory, Depends(get_contact_provider_factory)],
+) -> OutreachDetail:
+    """Run contact → tailor → draft for this match now (about 15-40 s). A draft that already exists is
+    returned as is; a failed one is retried."""
+    match, job, company = await _owned(session, user.id, match_id)
+    company_name = company.name
+    try:
+        outreach = await start_job_outreach(session, user.id, match, job)
+    except OutreachConflictError as exc:
+        await session.rollback()
+        raise api_error(
+            status.HTTP_409_CONFLICT,
+            "outreach_exists",
+            f"You already have an outreach in progress at {company_name}; one at a time per company.",
+        ) from exc
+    if outreach.status == OutreachStatus.DRAFTING:
+        await run_pipeline(session, outreach, user.id, llm, factory)
+    else:
+        await session.commit()
+    return await outreach_detail(session, outreach)

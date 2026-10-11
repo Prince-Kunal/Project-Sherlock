@@ -17,10 +17,11 @@ from app.core.db import get_sessionmaker
 from app.core.logging import configure_logging
 from app.core.redis import get_redis
 from app.models.enums import AtsType
+from app.services.email.pipeline import DraftPipeline, users_due_for_drafts
 from app.services.jobs.poll import PollSources, hn_keywords, run_poll
 from app.services.matching.embed import embed_missing_jobs
 from app.services.matching.pipeline import Matcher, expire_matches
-from app.services.registry import get_embedder, get_llm_client
+from app.services.registry import get_contact_provider_factory, get_embedder, get_llm_client
 from app.services.sources.adzuna import AdzunaSource
 from app.services.sources.ashby import AshbySource
 from app.services.sources.greenhouse import GreenhouseSource
@@ -86,6 +87,23 @@ async def expire_matches_task(ctx: dict[str, Any]) -> dict[str, int]:
     return {"expired": expired}
 
 
+async def build_daily_drafts(ctx: dict[str, Any], user_id: str | None = None) -> dict[str, int]:
+    """Hourly: users for whom it's 07:00 local time get today's batch (PLAN.md §8). With `user_id`
+    (the "Build today's drafts" button) that user's batch runs now."""
+    sessions = get_sessionmaker()
+    if user_id is not None:
+        user_ids = [uuid.UUID(user_id)]
+    else:
+        async with sessions() as session:
+            user_ids = await users_due_for_drafts(session, get_redis(), datetime.now(UTC))
+    if not user_ids:
+        return {"users": 0, "drafted": 0, "failed": 0, "stopped": 0}
+    pipeline = DraftPipeline(get_llm_client(), get_contact_provider_factory())
+    run = await pipeline.build_all(sessions, user_ids)
+    log.info("build_daily_drafts: %s stopped=%s", run.as_dict(), run.stopped)
+    return run.as_dict()
+
+
 async def startup(ctx: dict[str, Any]) -> None:
     configure_logging()
     ctx["http"] = PoliteHttpClient()
@@ -103,11 +121,14 @@ class WorkerSettings:
         # Results kept briefly: the job id doubles as a "already queued" guard for "Refresh matches",
         # and a long-kept result would block the next refresh.
         func(match_jobs_for_users, keep_result=60),
+        func(build_daily_drafts, keep_result=60),
     ]
     cron_jobs: ClassVar[list[CronJob]] = [
         # Every 6h, off the top of the hour. Not at startup: restarts shouldn't hammer job boards.
         cron(poll_sources, hour={0, 6, 12, 18}, minute=7, timeout=3600, unique=True),
         cron(expire_matches_task, name="expire_matches", hour={1}, minute=15, unique=True),
+        # Hourly; each user's batch runs in the hour that is 07:00 in their timezone.
+        cron(build_daily_drafts, minute={2}, timeout=3600, unique=True),
     ]
     on_startup = startup
     on_shutdown = shutdown

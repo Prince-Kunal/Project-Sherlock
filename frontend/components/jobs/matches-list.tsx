@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { ContactPanel } from "@/components/jobs/contact-panel";
+import { DraftNowButton } from "@/components/jobs/draft-now";
 import { TailorPreviewButton } from "@/components/jobs/tailor-preview";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -403,7 +404,10 @@ function MatchRow({ match }: { match: Match }) {
             match.fit_score !== null && (
               <>
                 <ContactPanel match={match} />
-                <TailorPreviewButton matchId={match.id} />
+                <div className="flex flex-wrap items-start gap-x-2">
+                  <DraftNowButton match={match} />
+                  <TailorPreviewButton matchId={match.id} />
+                </div>
               </>
             )}
           {(action.isError || block.isError) && (

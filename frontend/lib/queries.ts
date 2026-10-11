@@ -18,6 +18,10 @@ import type {
   ResumeVersion,
   HunterKeyStatus,
   Outreach,
+  OutreachDetail,
+  OutreachList,
+  OutreachStatus,
+  ReviewStats,
   TailorPreview,
 } from "@/lib/types";
 
@@ -209,7 +213,10 @@ export function useMatchAction() {
   return useMutation({
     mutationFn: ({ id, action }: { id: string; action: MatchAction }) =>
       apiFetch<Match>(`/matches/${id}/${action}`, { method: "POST" }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["matches"] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["matches"] });
+      void queryClient.invalidateQueries({ queryKey: ["outreach"] });
+    },
   });
 }
 
@@ -300,6 +307,104 @@ export function useSetContact() {
         method: "POST",
         body: JSON.stringify(body),
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["matches"] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["matches"] });
+      void queryClient.invalidateQueries({ queryKey: ["outreach"] });
+    },
+  });
+}
+
+// --- Review queue (Phase 6) ---------------------------------------------------
+
+export function useReviewStats() {
+  return useQuery({
+    queryKey: ["outreach", "stats"],
+    queryFn: () => apiFetch<ReviewStats>("/outreach/stats"),
+  });
+}
+
+export function useOutreachList(statuses: OutreachStatus[]) {
+  const query = statuses.map((s) => `status=${s}`).join("&");
+  return useQuery({
+    queryKey: ["outreach", "list", statuses],
+    queryFn: () => apiFetch<OutreachList>(`/outreach?${query}&limit=100`),
+  });
+}
+
+export function useOutreachDetail(id: string | null) {
+  return useQuery({
+    queryKey: ["outreach", "detail", id],
+    queryFn: () => apiFetch<OutreachDetail>(`/outreach/${id}`),
+    enabled: id !== null,
+  });
+}
+
+/** Store the returned draft and refresh the lists and stat cards. */
+function useOnOutreachChanged() {
+  const queryClient = useQueryClient();
+  return (detail: OutreachDetail) => {
+    queryClient.setQueryData(["outreach", "detail", detail.id], detail);
+    void queryClient.invalidateQueries({ queryKey: ["outreach", "list"] });
+    void queryClient.invalidateQueries({ queryKey: ["outreach", "stats"] });
+    void queryClient.invalidateQueries({ queryKey: ["matches"] });
+  };
+}
+
+export function useEditDraft() {
+  const onChanged = useOnOutreachChanged();
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...body
+    }: {
+      id: string;
+      subject?: string;
+      body?: string;
+    }) =>
+      apiFetch<OutreachDetail>(`/outreach/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    onSuccess: onChanged,
+  });
+}
+
+export function useRegenerateDraft() {
+  const onChanged = useOnOutreachChanged();
+  return useMutation({
+    mutationFn: ({ id, hint }: { id: string; hint?: string }) =>
+      apiFetch<OutreachDetail>(`/outreach/${id}/regenerate`, {
+        method: "POST",
+        body: JSON.stringify({ hint: hint || null }),
+      }),
+    onSuccess: onChanged,
+  });
+}
+
+export type ReviewAction = "approve" | "skip" | "retry";
+
+export function useReviewAction() {
+  const onChanged = useOnOutreachChanged();
+  return useMutation({
+    mutationFn: ({ id, action }: { id: string; action: ReviewAction }) =>
+      apiFetch<OutreachDetail>(`/outreach/${id}/${action}`, { method: "POST" }),
+    onSuccess: onChanged,
+  });
+}
+
+export function useBuildDrafts() {
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<{ queued: boolean }>("/outreach/build", { method: "POST" }),
+  });
+}
+
+/** "Draft now" on a match: contact → tailor → draft, synchronously. */
+export function useDraftNow() {
+  const onChanged = useOnOutreachChanged();
+  return useMutation({
+    mutationFn: (matchId: string) =>
+      apiFetch<OutreachDetail>(`/matches/${matchId}/draft`, { method: "POST" }),
+    onSuccess: onChanged,
   });
 }

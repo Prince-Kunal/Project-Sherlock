@@ -5,13 +5,18 @@ import uuid
 import pytest
 from cryptography.fernet import Fernet
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.security import SecretDecryptionError, decrypt_secret, encrypt_secret
-from app.models import Company, Job, Outreach, User
-from app.models.enums import CampaignType, JobSourceType, OutreachStatus
+from app.models import Company, Contact, Job, Outreach, OutreachEvent, User
+from app.models.enums import CampaignType, JobSourceType, OutreachEventType, OutreachStatus
+from app.schemas.outreach import EmailDraft
+from app.schemas.resume import Basics
+from app.services.email.drafter import MAX_EDIT_WORDS, OPT_OUT_LINE, check_text, compose_body
+from app.services.resume.files import save_tailored_pdf
 
 
 async def _user_and_company(session: AsyncSession) -> tuple[User, Company]:
@@ -130,3 +135,68 @@ async def test_user_cannot_see_or_change_another_users_matches(
         await auth_client.post(f"/companies/{company_id}/block", headers=other_user_headers)
     ).status_code == 200
     assert len((await auth_client.get("/matches", params={"min_score": 0})).json()["items"]) == 2
+
+
+# --- Invariant 9: every outgoing email contains an opt-out line ---
+
+
+def test_drafts_always_get_the_opt_out_line_and_edits_cannot_drop_it() -> None:
+    draft = EmailDraft(
+        subject="Referral", body="Would you refer me? Resume attached.", personalization_source="x"
+    )
+    body = compose_body(draft, Contact(full_name="Priya Nair", email="p@x.example"), Basics(name="A B"))
+    assert OPT_OUT_LINE in body
+    assert check_text("Referral", body, max_words=MAX_EDIT_WORDS) == []
+    issues = check_text("Referral", body.replace(OPT_OUT_LINE, ""), max_words=MAX_EDIT_WORDS)
+    assert [i.code for i in issues] == ["no_opt_out"]
+
+
+# --- Invariant 11: no approval without an ATS-passing PDF; invariant 1: approval is recorded ---
+
+
+async def test_approve_needs_a_passing_resume_and_records_who_approved(
+    auth_client: AsyncClient, session: AsyncSession
+) -> None:
+    me = uuid.UUID((await auth_client.get("/auth/me")).json()["id"])
+    company = Company(name="Acme", domain="acme.example")
+    session.add(company)
+    await session.flush()
+    contact = Contact(
+        company_id=company.id, full_name="Priya Nair", email="priya@acme.example", email_source="hunter"
+    )
+    session.add(contact)
+    await session.flush()
+    outreach = Outreach(
+        user_id=me,
+        company_id=company.id,
+        campaign_type=CampaignType.OPEN,
+        contact_id=contact.id,
+        status=OutreachStatus.PENDING_REVIEW,
+        subject="Referral",
+        body=f"Hi Priya,\n\nCould you refer me? Resume attached.\n\n{OPT_OUT_LINE}\n\nBest,\nA B",
+        tailored_resume={
+            "ats": {"passed": False, "failures": ["cid"], "page_count": 1, "keyword_coverage": None}
+        },
+    )
+    session.add(outreach)
+    await session.commit()
+
+    missing = await auth_client.post(f"/outreach/{outreach.id}/approve")
+    assert missing.status_code == 409
+    assert missing.json()["detail"]["code"] == "resume_missing"
+    await save_tailored_pdf(me, str(outreach.id), "A_B_Resume.pdf", b"%PDF-1.7 fake")
+    failing = await auth_client.post(f"/outreach/{outreach.id}/approve")
+    assert failing.status_code == 409  # the PDF exists but failed the ATS check
+
+    outreach.tailored_resume = {
+        "ats": {"passed": True, "failures": [], "page_count": 1, "keyword_coverage": None}
+    }
+    await session.commit()
+    ok = await auth_client.post(f"/outreach/{outreach.id}/approve")
+    assert ok.status_code == 200, ok.text
+    event = await session.scalar(
+        select(OutreachEvent).where(OutreachEvent.type == OutreachEventType.APPROVED)
+    )
+    assert event is not None
+    assert event.user_id == me
+    assert event.payload["actor"] == str(me)
