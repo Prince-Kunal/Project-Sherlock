@@ -18,7 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { errorMessage } from "@/lib/api";
+import { ApiError, errorMessage } from "@/lib/api";
 import {
   useResumeVersion,
   useResumeVersions,
@@ -32,7 +32,56 @@ import type {
   ResumeOut,
 } from "@/lib/types";
 
-const DATE_HINT = "YYYY-MM, YYYY or present";
+const DATE_HINT = "e.g. 2026-09, 2026 or present";
+
+const SECTIONS: Record<string, string> = {
+  basics: "Contact",
+  summary: "Summary",
+  education: "Education",
+  experience: "Experience",
+  projects: "Projects",
+  skills: "Skills",
+  achievements: "Achievements",
+};
+
+const FIELDS: Record<string, string> = {
+  start: "start date",
+  end: "end date",
+  bullets: "bullet",
+};
+
+/** Turn a save error's `["body", "experience", 1, "start"]` into "Experience 2 (Kollide), start date". */
+function saveErrorMessage(error: unknown, resume: MasterResume | undefined) {
+  const detail =
+    error instanceof ApiError
+      ? (error.detail as { detail?: unknown } | null)?.detail
+      : null;
+  if (!Array.isArray(detail) || !resume) return errorMessage(error);
+  return detail
+    .map((d: { loc?: (string | number)[]; msg?: string }) => {
+      const [section, index, field, ...rest] = (d.loc ?? []).slice(1);
+      const msg = (d.msg ?? "").replace(/^Value error, /, "");
+      if (typeof section !== "string") return msg;
+      let where = SECTIONS[section] ?? section;
+      if (typeof index === "number") {
+        const entries = resume[section as keyof MasterResume];
+        const entry = Array.isArray(entries) ? entries[index] : undefined;
+        const name =
+          entry && typeof entry === "object"
+            ? ("org" in entry && entry.org) ||
+              ("institution" in entry && entry.institution) ||
+              ("name" in entry && entry.name)
+            : null;
+        where += ` ${index + 1}${name ? ` (${name})` : ""}`;
+      }
+      if (typeof field === "string") {
+        where += `, ${FIELDS[field] ?? field}`;
+        if (typeof rest[0] === "number") where += ` ${rest[0] + 1}`;
+      }
+      return `${where}: ${msg}`;
+    })
+    .join(". ");
+}
 
 function Field({
   label,
@@ -156,12 +205,14 @@ function ResumeForm({
   onSave,
   saving,
   saveLabel,
+  error,
 }: {
   initial: MasterResume;
   readOnly: boolean;
   onSave: (resume: MasterResume) => void;
   saving: boolean;
   saveLabel: string;
+  error: string | null;
 }) {
   const [draft, setDraft] = useState<MasterResume>(initial);
   const [dirty, setDirty] = useState(false);
@@ -561,8 +612,17 @@ function ResumeForm({
       </fieldset>
 
       <div className="bg-background/95 sticky bottom-0 flex items-center justify-end gap-3 border-t py-3 backdrop-blur">
-        {dirty && !readOnly && (
-          <span className="text-muted-foreground text-sm">Unsaved changes</span>
+        {error ? (
+          <span role="alert" className="text-destructive mr-auto text-sm">
+            {error}
+          </span>
+        ) : (
+          dirty &&
+          !readOnly && (
+            <span className="text-muted-foreground text-sm">
+              Unsaved changes
+            </span>
+          )
         )}
         <Button type="submit" disabled={saving || (!readOnly && !dirty)}>
           {saving ? "Saving…" : saveLabel}
@@ -579,6 +639,9 @@ export function ResumeEditor({ current }: { current: ResumeOut }) {
   const older = useResumeVersion(viewing);
   const showingOld = viewing !== null && viewing !== current.version;
   const shown = showingOld ? older.data : current;
+  const saveError = save.isError
+    ? saveErrorMessage(save.error, save.variables)
+    : null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -608,9 +671,7 @@ export function ResumeEditor({ current }: { current: ResumeOut }) {
           <Badge variant="secondary">Read-only: older version</Badge>
         )}
       </div>
-      {save.isError && (
-        <p className="text-destructive text-sm">{errorMessage(save.error)}</p>
-      )}
+      {save.isError && <p className="text-destructive text-sm">{saveError}</p>}
       {shown && (
         <ResumeForm
           // Remount on version change so the draft resets to the saved data.
@@ -618,6 +679,7 @@ export function ResumeEditor({ current }: { current: ResumeOut }) {
           initial={shown.data}
           readOnly={showingOld}
           saving={save.isPending}
+          error={saveError}
           saveLabel={
             showingOld
               ? `Restore v${shown.version} as a new version`

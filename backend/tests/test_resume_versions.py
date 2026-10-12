@@ -1,7 +1,10 @@
 from typing import Any
 
+import pytest
 from httpx import AsyncClient
+from pydantic import ValidationError
 
+from app.schemas.resume import Experience
 from app.services.llm.fake import FakeLLMClient
 from tests.conftest import FIXTURES, recorded
 
@@ -78,8 +81,38 @@ async def test_duplicate_ids_rejected(with_llm_key: AsyncClient, fake_llm: FakeL
 
 async def test_bad_date_format_rejected(with_llm_key: AsyncClient, fake_llm: FakeLLMClient) -> None:
     v1 = await _upload(with_llm_key, fake_llm)
-    v1["education"][0]["start"] = "Aug 2024"
-    assert (await with_llm_key.put("/resume", json=v1)).status_code == 422
+    v1["education"][0]["start"] = "Spring 2024"
+    response = await with_llm_key.put("/resume", json=v1)
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"][-3:] == ["education", 0, "start"]
+
+
+@pytest.mark.parametrize(
+    ("typed", "stored"),
+    [
+        ("2026-09", "2026-09"),
+        ("2026-9", "2026-09"),
+        ("2026/09", "2026-09"),
+        ("09/2026", "2026-09"),
+        ("9.2026", "2026-09"),
+        ("Sep 2026", "2026-09"),
+        ("September, 2026", "2026-09"),
+        ("sept-2026", "2026-09"),
+        ("2026–09", "2026-09"),  # en dash
+        (" 2026 ", "2026"),
+        ("Present", "present"),
+        ("current", "present"),
+        ("", None),
+    ],
+)
+def test_dates_are_accepted_as_people_write_them(typed: str, stored: str | None) -> None:
+    assert Experience(id="e", org="Kollide", role="Co-founder", start=typed).start == stored
+
+
+@pytest.mark.parametrize("typed", ["2026-13", "13/2026", "Spring 2026", "26-09", "2026-09 to present"])
+def test_dates_that_cant_be_read_are_refused(typed: str) -> None:
+    with pytest.raises(ValidationError, match="write it like 2026-09"):
+        Experience(id="e", org="Kollide", role="Co-founder", start=typed)
 
 
 async def test_resume_before_upload_is_404(auth_client: AsyncClient) -> None:

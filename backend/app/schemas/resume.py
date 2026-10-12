@@ -10,15 +10,57 @@ from typing import Annotated
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
 _DATE_RE = re.compile(r"^(\d{4}(-(0[1-9]|1[0-2]))?|present)$")
+_PRESENT = {"present", "current", "now", "ongoing", "today", "till date", "till now", "to date"}
+_MONTHS = {
+    name: n
+    for n, names in enumerate(
+        [
+            ("jan", "january"),
+            ("feb", "february"),
+            ("mar", "march"),
+            ("apr", "april"),
+            ("may",),
+            ("jun", "june"),
+            ("jul", "july"),
+            ("aug", "august"),
+            ("sep", "sept", "september"),
+            ("oct", "october"),
+            ("nov", "november"),
+            ("dec", "december"),
+        ],
+        start=1,
+    )
+    for name in names
+}
+_YEAR_MONTH_RE = re.compile(r"^(\d{4})-(\d{1,2})$")
+_MONTH_YEAR_RE = re.compile(r"^(\d{1,2})-(\d{4})$")
+_NAMED_RE = re.compile(r"^([a-z]+)-(\d{4})$")
 
 
 def _check_date(value: str | None) -> str | None:
+    """Accept the usual ways people write a resume date ("2026-9", "09/2026", "Sep 2026", "Present")
+    and store one form: "YYYY-MM", "YYYY" or "present"."""
     if value is None:
         return None
-    value = value.strip().lower()
-    if not _DATE_RE.match(value):
-        raise ValueError('date must be "YYYY-MM", "YYYY" or "present"')
-    return value
+    raw = " ".join(value.strip().lower().split())
+    if not raw:
+        return None
+    if raw in _PRESENT:
+        return "present"
+    # Any separator (slash, dot, space, comma, the dashes macOS substitutes) becomes "-".
+    text = re.sub("[\\s/.,\u2010-\u2015\u2212-]+", "-", raw).strip("-")
+    year = month = None
+    if match := _YEAR_MONTH_RE.match(text):
+        year, month = match[1], int(match[2])
+    elif match := _MONTH_YEAR_RE.match(text):
+        month, year = int(match[1]), match[2]
+    elif (match := _NAMED_RE.match(text)) and match[1] in _MONTHS:
+        month, year = _MONTHS[match[1]], match[2]
+    if year is not None and month is not None and 1 <= month <= 12:
+        text = f"{year}-{month:02d}"
+    if not _DATE_RE.match(text):
+        raise ValueError(f'"{value.strip()}" isn\'t a date; write it like 2026-09, 2026 or present')
+    return text
 
 
 ResumeDate = Annotated[str | None, AfterValidator(_check_date)]
