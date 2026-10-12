@@ -409,10 +409,14 @@ DAILY_DRAFT_HOUR = 7  # PLAN.md §8: build_daily_drafts runs at 07:00 in each us
 
 
 async def users_due_for_drafts(
-    session: AsyncSession, redis: Redis, now: datetime, hour: int = DAILY_DRAFT_HOUR
+    session: AsyncSession,
+    redis: Redis,
+    now: datetime,
+    hour: int = DAILY_DRAFT_HOUR,
+    job: str = "drafts_built",
 ) -> list[uuid.UUID]:
-    """Active users for whom it is now `hour` o'clock local time and today's batch hasn't run yet.
-    The Redis guard makes the hourly task idempotent: one automatic run per user per local day."""
+    """Active users for whom it is now `hour` o'clock local time and today's `job` hasn't run yet.
+    The Redis guard makes an hourly task idempotent: one automatic run per user per local day."""
     due = []
     for user_id, tz in (
         await session.execute(select(User.id, User.timezone).where(User.is_active.is_(True)))
@@ -423,6 +427,6 @@ async def users_due_for_drafts(
             local = now.astimezone(ZoneInfo("Asia/Kolkata"))
         if local.hour != hour:
             continue
-        if await redis.set(f"drafts_built:{user_id}:{local.date().isoformat()}", "1", nx=True, ex=2 * 86400):
+        if await redis.set(f"{job}:{user_id}:{local.date().isoformat()}", "1", nx=True, ex=2 * 86400):
             due.append(user_id)
     return due

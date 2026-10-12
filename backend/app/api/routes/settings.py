@@ -9,14 +9,18 @@ from app.api.errors import api_error, llm_errors
 from app.core.auth import CurrentUser
 from app.core.config import get_settings
 from app.core.db import get_session
+from app.core.redis import get_redis
 from app.models.enums import ServiceKeyType
-from app.schemas.settings import HunterKeyIn, HunterKeyStatus, LLMKeyIn, LLMKeyStatus
+from app.schemas.settings import GmailStatus, HunterKeyIn, HunterKeyStatus, LLMKeyIn, LLMKeyStatus
 from app.services.contacts.base import ContactProviderAuthError, ContactProviderError
 from app.services.contacts.keys import get_service_key_row, save_service_key
 from app.services.contacts.service import ProviderFactory, contact_searches_this_month
+from app.services.email.connection import GmailAccess, get_token_row, gmail_usable, has_gmail_scopes
+from app.services.google.oauth import GoogleOAuth
 from app.services.llm.client import LLMClient
 from app.services.llm.user_keys import FREE_TIER_NOTICE, get_key_row, save_key
-from app.services.registry import get_contact_provider_factory, get_llm_client
+from app.services.matching.pipeline import load_preferences
+from app.services.registry import get_contact_provider_factory, get_google_oauth, get_llm_client
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -110,3 +114,36 @@ async def delete_hunter_key(user: CurrentUser, session: Session) -> None:
     if row is not None:
         await session.delete(row)
         await session.commit()
+
+
+# --- Gmail (PLAN.md Phase 7) ---------------------------------------------------------------------
+
+
+@router.get("/gmail", response_model=GmailStatus)
+async def gmail_status(
+    user: CurrentUser, session: Session, oauth: Annotated[GoogleOAuth | None, Depends(get_google_oauth)]
+) -> GmailStatus:
+    row = await get_token_row(session, user.id)
+    prefs = await load_preferences(session, user.id)
+    return GmailStatus(
+        connected=gmail_usable(row),
+        email=user.email,
+        needs_reauth=bool(row and row.needs_reauth),
+        missing_permissions=bool(row and not has_gmail_scopes(row)),
+        connected_at=row.updated_at if row else None,
+        paused=prefs.paused,
+        google_sign_in=oauth is not None,
+    )
+
+
+@router.delete("/gmail", status_code=status.HTTP_204_NO_CONTENT)
+async def disconnect_gmail(
+    user: CurrentUser, session: Session, oauth: Annotated[GoogleOAuth | None, Depends(get_google_oauth)]
+) -> None:
+    """Revoke Sherlock's access at Google and forget the tokens. Scheduled emails wait until Gmail is
+    connected again."""
+    if oauth is not None:
+        await GmailAccess(oauth, get_redis()).revoke(session, user.id)
+    elif (row := await get_token_row(session, user.id)) is not None:
+        await session.delete(row)
+    await session.commit()

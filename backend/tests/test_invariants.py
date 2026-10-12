@@ -1,11 +1,13 @@
 """Invariant tests (PLAN.md §2). Never skip these. Later phases add the send-time checks."""
 
+import random
 import uuid
+from datetime import timedelta
 
 import pytest
 from cryptography.fernet import Fernet
 from httpx import AsyncClient
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,7 +18,11 @@ from app.models.enums import CampaignType, JobSourceType, OutreachEventType, Out
 from app.schemas.outreach import EmailDraft
 from app.schemas.resume import Basics
 from app.services.email.drafter import MAX_EDIT_WORDS, OPT_OUT_LINE, OPT_OUT_LINES, check_text, compose_body
+from app.services.email.fake_gmail import FakeGmailClient
+from app.services.email.scheduler import Scheduler
+from app.services.email.state import record_event, transition
 from app.services.resume.files import save_tailored_pdf
+from tests.sending_fixtures import MONDAY_11_IST, mailbox_factory, sendable, sender
 
 
 async def _user_and_company(session: AsyncSession) -> tuple[User, Company]:
@@ -200,3 +206,60 @@ async def test_approve_needs_a_passing_resume_and_records_who_approved(
     assert event is not None
     assert event.user_id == me
     assert event.payload["actor"] == str(me)
+
+
+# --- Invariant 1: nothing is sent without a current approval by the owner (checked at send time) ---
+
+
+async def _forced_scheduled(session: AsyncSession, outreach: Outreach) -> None:
+    """Bypass the state machine, as a bug or a manual DB edit might."""
+    await session.execute(
+        update(Outreach)
+        .where(Outreach.id == outreach.id)
+        .values(status=OutreachStatus.SCHEDULED, scheduled_at=MONDAY_11_IST - timedelta(minutes=1))
+    )
+    await session.commit()
+
+
+async def _send_due(session: AsyncSession, user: User) -> tuple[FakeGmailClient, str]:
+    mailbox = FakeGmailClient(user.email)
+    scheduler = Scheduler(mailbox_factory(mailbox), random.Random(0))
+    outreach_id = await session.scalar(select(Outreach.id).where(Outreach.user_id == user.id))
+    assert outreach_id is not None
+    result = await scheduler.send_one(session, user, outreach_id, MONDAY_11_IST)
+    await session.commit()
+    return mailbox, result
+
+
+async def test_an_unapproved_email_forced_to_scheduled_is_never_sent(session: AsyncSession) -> None:
+    user = await sender(session)
+    outreach = await sendable(session, user, approve=False)
+    await _forced_scheduled(session, outreach)
+    mailbox, result = await _send_due(session, user)
+    assert result == "not_approved"
+    assert mailbox.sent == []
+    await session.refresh(outreach)
+    assert outreach.status == OutreachStatus.PENDING_REVIEW
+
+
+async def test_an_edit_after_approval_voids_the_approval(session: AsyncSession) -> None:
+    user = await sender(session)
+    outreach = await sendable(session, user)  # approved
+    await record_event(session, outreach, OutreachEventType.EDITED, {"before": {}, "after": {}})
+    await session.commit()
+    await _forced_scheduled(session, outreach)
+    mailbox, result = await _send_due(session, user)
+    assert result == "not_approved"
+    assert mailbox.sent == []
+
+
+async def test_an_approval_recorded_for_someone_else_does_not_count(session: AsyncSession) -> None:
+    owner = await sender(session)
+    stranger = await sender(session, email="stranger@example.com")
+    outreach = await sendable(session, owner, approve=False)
+    await transition(session, outreach, OutreachStatus.APPROVED, actor_id=stranger.id)
+    await session.commit()
+    await _forced_scheduled(session, outreach)
+    mailbox, result = await _send_due(session, owner)
+    assert result == "not_approved"
+    assert mailbox.sent == []

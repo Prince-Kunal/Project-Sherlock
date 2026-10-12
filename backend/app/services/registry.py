@@ -12,16 +12,21 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.config import Settings, get_settings
 from app.core.redis import get_redis
+from app.models import User
 from app.services.contacts.base import ContactProvider
 from app.services.contacts.fake import FakeContactProvider
 from app.services.contacts.hunter import HunterProvider
+from app.services.email.connection import GmailAccess, GmailFactory
 from app.services.email.fake_gmail import FakeGmailClient
 from app.services.email.gmail import GmailClient
 from app.services.embeddings.bge import BgeEmbedder
 from app.services.embeddings.embedder import Embedder
 from app.services.embeddings.fake import FakeEmbedder
+from app.services.google.oauth import GoogleOAuth, HttpGoogleOAuth
 from app.services.llm.anthropic import AnthropicClient
 from app.services.llm.cache import LLMCache
 from app.services.llm.client import LLMClient
@@ -147,10 +152,35 @@ def get_contact_provider_factory() -> Callable[[str], ContactProvider]:
 _fake_mailboxes: dict[str, FakeGmailClient] = {}
 
 
-def get_gmail_client(user_email: str) -> GmailClient:
-    if get_settings().use_fakes:
-        return _fake_mailboxes.setdefault(user_email, FakeGmailClient(user_email))
-    raise NotImplementedError("real Gmail client arrives in Phase 7; set USE_FAKES=true")
+def fake_mailbox(user_email: str) -> FakeGmailClient:
+    return _fake_mailboxes.setdefault(user_email, FakeGmailClient(user_email))
+
+
+async def _fake_gmail(_session: AsyncSession, user: User) -> GmailClient:
+    return fake_mailbox(user.email)
+
+
+def get_google_oauth() -> GoogleOAuth | None:
+    """The real Google OAuth client when GOOGLE_CLIENT_ID/SECRET are set, otherwise None (sign in
+    with dev-login). Independent of USE_FAKES so real sign-in can be tried against fake services."""
+    settings = get_settings()
+    if not (settings.google_client_id and settings.google_client_secret):
+        return None
+    return HttpGoogleOAuth(
+        settings.google_client_id, settings.google_client_secret, settings.google_redirect_uri
+    )
+
+
+def get_gmail_factory() -> GmailFactory:
+    """A function from (session, user) to that user's Gmail client. USE_FAKES gives an in-memory
+    mailbox per user; otherwise their stored Google authorisation is used."""
+    settings = get_settings()
+    if settings.use_fakes:
+        return _fake_gmail
+    oauth = get_google_oauth()
+    if oauth is None:
+        raise RuntimeError("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are needed to send with Gmail")
+    return GmailAccess(oauth, get_redis())
 
 
 @lru_cache

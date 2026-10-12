@@ -6,6 +6,11 @@
        │              └──► skipped                    └─► send_failed ─► pending_review
        └──► failed ──► drafting (retry once the cause is fixed, e.g. a contact added by hand)
 
+Phase 7 additions (from the Phase 7 task text): a bounce fails a sent outreach (sent/followup_due →
+failed); a reply cancels a follow-up that is still being reviewed, approved or scheduled (those →
+replied, only for outreach already sent); and an approved or scheduled email can be pulled back to
+review before it goes out (scheduled → pending_review).
+
 `transition` validates the move and appends an `outreach_events` row in the same transaction.
 """
 
@@ -21,12 +26,12 @@ S = OutreachStatus
 
 ALLOWED: dict[OutreachStatus, set[OutreachStatus]] = {
     S.DRAFTING: {S.PENDING_REVIEW, S.FAILED},
-    S.PENDING_REVIEW: {S.PENDING_REVIEW, S.APPROVED, S.SKIPPED, S.DRAFTING, S.FAILED},
-    S.APPROVED: {S.SCHEDULED, S.PENDING_REVIEW},
-    S.SCHEDULED: {S.SENT, S.SEND_FAILED},
+    S.PENDING_REVIEW: {S.PENDING_REVIEW, S.APPROVED, S.SKIPPED, S.DRAFTING, S.FAILED, S.REPLIED},
+    S.APPROVED: {S.SCHEDULED, S.PENDING_REVIEW, S.REPLIED},
+    S.SCHEDULED: {S.SENT, S.SEND_FAILED, S.PENDING_REVIEW, S.REPLIED},
     S.SEND_FAILED: {S.PENDING_REVIEW},
-    S.SENT: {S.REPLIED, S.FOLLOWUP_DUE, S.CLOSED},
-    S.FOLLOWUP_DUE: {S.PENDING_REVIEW, S.REPLIED, S.CLOSED},
+    S.SENT: {S.REPLIED, S.FOLLOWUP_DUE, S.CLOSED, S.FAILED},
+    S.FOLLOWUP_DUE: {S.PENDING_REVIEW, S.REPLIED, S.CLOSED, S.FAILED},
     S.REPLIED: {S.CLOSED},
     S.FAILED: {S.DRAFTING},
     S.SKIPPED: set(),
@@ -45,7 +50,7 @@ DEFAULT_EVENT: dict[OutreachStatus, OutreachEventType] = {
     S.CLOSED: OutreachEventType.CLOSED,
     S.FAILED: OutreachEventType.FAILED,
     S.DRAFTING: OutreachEventType.RETRIED,
-    S.FOLLOWUP_DUE: OutreachEventType.FOLLOWUP_DRAFTED,
+    S.FOLLOWUP_DUE: OutreachEventType.FOLLOWUP_DUE,
 }
 
 
@@ -87,6 +92,8 @@ async def transition(
     system). Moving to `failed` requires a reason; leaving it clears the reason. Caller commits."""
     if not can_transition(outreach.status, target):
         raise InvalidTransitionError(outreach.status, target)
+    if target == S.REPLIED and outreach.gmail_thread_id is None:
+        raise InvalidTransitionError(outreach.status, target)  # nothing was sent, so nothing to reply to
     if target == S.FAILED and not failure_reason:
         raise ValueError("moving to failed needs a failure_reason")
     before = outreach.status

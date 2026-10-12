@@ -81,7 +81,7 @@ class FakeContactProvider(ContactProvider):
                     confidence=90,
                     verification=VerificationStatus(status) if status else None,
                     verified_at=now if status else None,
-                    source=EmailSource.HUNTER,
+                    source=EmailSource.FAKE,
                 )
                 for first, last, title, department, seniority, status in self.people
             ],
@@ -95,7 +95,7 @@ class FakeContactProvider(ContactProvider):
         self.calls.append(("find_email", (domain, first_name, last_name)))
         self._check()
         email = f"{first_name.lower()}@{domain}"
-        return EmailResult(email=email, confidence=90, verification=None, source=EmailSource.HUNTER)
+        return EmailResult(email=email, confidence=90, verification=None, source=EmailSource.FAKE)
 
     async def verify(self, email: str) -> VerificationStatus:
         self.calls.append(("verify", (email,)))

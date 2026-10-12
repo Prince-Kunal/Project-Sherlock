@@ -21,3 +21,10 @@ def test_worker_runs_build_daily_drafts_hourly() -> None:
     job = next(j for j in WorkerSettings.cron_jobs if j.name == "cron:build_daily_drafts")
     assert job.hour is None  # every hour: each user's batch runs when it's 07:00 for them
     assert job.minute == {2}
+
+
+def test_worker_runs_sending_reply_and_follow_up_tasks() -> None:
+    jobs = {j.name: j for j in WorkerSettings.cron_jobs}
+    assert jobs["cron:schedule_and_send"].minute == set(range(0, 60, 5))  # every 5 min (PLAN.md §8)
+    assert jobs["cron:check_replies"].minute == {11, 41}  # every 30 min
+    assert jobs["cron:create_followups"].hour is None  # hourly; 08:00 in each user's timezone

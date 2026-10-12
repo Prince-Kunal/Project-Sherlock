@@ -59,6 +59,7 @@ class EmailSource(StrEnum):
     MANUAL = "manual"
     PATTERN = "pattern"
     HN = "hn"  # an address the company posted in its HN "Who is hiring" comment
+    FAKE = "fake"  # made up by FakeContactProvider (USE_FAKES=true); never emailed for real
 
 
 class VerificationStatus(StrEnum):
@@ -119,6 +120,7 @@ class OutreachEventType(StrEnum):
     SENT = "sent"
     SEND_FAILED = "send_failed"
     REPLY_DETECTED = "reply_detected"
+    FOLLOWUP_DUE = "followup_due"  # sent, no reply, waited long enough for the one follow-up
     FOLLOWUP_DRAFTED = "followup_drafted"
     FOLLOWUP_SENT = "followup_sent"
     BOUNCED = "bounced"

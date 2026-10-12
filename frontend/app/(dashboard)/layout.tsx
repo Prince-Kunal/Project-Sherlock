@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
+import { StatusBanner } from "@/components/status-banner";
 import { Button } from "@/components/ui/button";
 import { ApiError } from "@/lib/api";
 import { useLogout, useMe } from "@/lib/auth";
@@ -98,6 +99,7 @@ export default function DashboardLayout({
           })}
         </nav>
       </header>
+      <StatusBanner />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
         {children}
       </main>

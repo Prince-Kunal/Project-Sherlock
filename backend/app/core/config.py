@@ -29,6 +29,13 @@ class Settings(BaseSettings):
 
     google_client_id: str = ""
     google_client_secret: str = ""
+    # Google redirects here; it goes through the Next.js /api proxy so the session cookie is first-party.
+    google_redirect_uri: str = "http://localhost:3000/api/auth/google/callback"
+    frontend_url: str = "http://localhost:3000"
+    admin_emails: list[str] = Field(default_factory=list)  # always allowed to sign in, and admins
+
+    send_jitter_min_minutes: int = 3
+    send_jitter_max_minutes: int = 12
 
     use_fakes: bool = False
     llm_provider: Literal["gemini", "anthropic"] = "gemini"

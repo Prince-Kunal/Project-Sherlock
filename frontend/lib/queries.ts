@@ -20,9 +20,13 @@ import type {
   Outreach,
   OutreachDetail,
   OutreachList,
+  AllowedEmail,
+  GmailStatus,
+  Outcome,
   OutreachStatus,
   ReviewStats,
   TailorPreview,
+  TimelineEntry,
 } from "@/lib/types";
 
 export const keys = {
@@ -323,11 +327,17 @@ export function useReviewStats() {
   });
 }
 
-export function useOutreachList(statuses: OutreachStatus[]) {
-  const query = statuses.map((s) => `status=${s}`).join("&");
+export function useOutreachList(
+  statuses: OutreachStatus[],
+  outcomes: Outcome[] = [],
+) {
+  const query = [
+    ...statuses.map((s) => `status=${s}`),
+    ...outcomes.map((o) => `outcome=${o}`),
+  ].join("&");
   return useQuery({
-    queryKey: ["outreach", "list", statuses],
-    queryFn: () => apiFetch<OutreachList>(`/outreach?${query}&limit=100`),
+    queryKey: ["outreach", "list", statuses, outcomes],
+    queryFn: () => apiFetch<OutreachList>(`/outreach?${query}&limit=200`),
   });
 }
 
@@ -381,7 +391,7 @@ export function useRegenerateDraft() {
   });
 }
 
-export type ReviewAction = "approve" | "skip" | "retry";
+export type ReviewAction = "approve" | "skip" | "retry" | "unapprove" | "close";
 
 export function useReviewAction() {
   const onChanged = useOnOutreachChanged();
@@ -406,5 +416,89 @@ export function useDraftNow() {
     mutationFn: (matchId: string) =>
       apiFetch<OutreachDetail>(`/matches/${matchId}/draft`, { method: "POST" }),
     onSuccess: onChanged,
+  });
+}
+
+// --- Sending and tracking (Phase 7) ---------------------------------------------
+
+export function useTimeline(id: string | null) {
+  return useQuery({
+    queryKey: ["outreach", "timeline", id],
+    queryFn: () => apiFetch<TimelineEntry[]>(`/outreach/${id}/timeline`),
+    enabled: id !== null,
+  });
+}
+
+export function useSetTracking() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...body
+    }: {
+      id: string;
+      outcome?: Outcome;
+      notes?: string;
+    }) =>
+      apiFetch<OutreachDetail>(`/outreach/${id}/tracking`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    onSuccess: (detail) => {
+      queryClient.setQueryData(["outreach", "detail", detail.id], detail);
+      void queryClient.invalidateQueries({ queryKey: ["outreach", "list"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["outreach", "timeline", detail.id],
+      });
+    },
+  });
+}
+
+export function useGmailStatus() {
+  return useQuery({
+    queryKey: ["settings", "gmail"],
+    queryFn: () => apiFetch<GmailStatus>("/settings/gmail"),
+  });
+}
+
+export function useDisconnectGmail() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiFetch<void>("/settings/gmail", { method: "DELETE" }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["settings", "gmail"] }),
+  });
+}
+
+export function useAllowedEmails(enabled: boolean) {
+  return useQuery({
+    queryKey: ["admin", "allowed-emails"],
+    queryFn: () => apiFetch<AllowedEmail[]>("/admin/allowed-emails"),
+    enabled,
+  });
+}
+
+export function useAllowEmail() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (email: string) =>
+      apiFetch<AllowedEmail>("/admin/allowed-emails", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["admin", "allowed-emails"] }),
+  });
+}
+
+export function useRemoveAllowedEmail() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (email: string) =>
+      apiFetch<void>(`/admin/allowed-emails/${encodeURIComponent(email)}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["admin", "allowed-emails"] }),
   });
 }

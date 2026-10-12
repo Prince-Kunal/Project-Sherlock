@@ -9,9 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.errors import api_error
 from app.core.auth import AdminUser
 from app.core.db import get_session
-from app.models import Company, Job
+from app.models import AllowedEmail, Company, Job, User
 from app.models.enums import AtsType
 from app.schemas.jobs import CompanyIn, CompanyOut
+from app.schemas.settings import AllowedEmailIn, AllowedEmailOut
 from app.services.registry import get_source_http
 from app.services.sources.ashby import AshbySource
 from app.services.sources.base import CompanyRef, JobSource
@@ -109,3 +110,40 @@ class PollQueued(BaseModel):
 async def trigger_poll(_: AdminUser) -> PollQueued:
     """Queue poll_sources on the worker now instead of waiting for the 6-hourly cron."""
     return PollQueued(job_id=await enqueue("poll_sources", job_id="poll_sources:manual"))
+
+
+# --- Who may sign in (PLAN.md Phase 7: only allowlisted addresses) --------------------------------
+
+
+@router.get("/allowed-emails", response_model=list[AllowedEmailOut])
+async def list_allowed(_: AdminUser, session: Session) -> list[AllowedEmailOut]:
+    rows = (await session.scalars(select(AllowedEmail).order_by(AllowedEmail.created_at))).all()
+    users = set((await session.scalars(select(func.lower(User.email)))).all())
+    return [
+        AllowedEmailOut(email=r.email, created_at=r.created_at, signed_up=r.email.lower() in users)
+        for r in rows
+    ]
+
+
+@router.post("/allowed-emails", response_model=AllowedEmailOut, status_code=status.HTTP_201_CREATED)
+async def add_allowed(body: AllowedEmailIn, _: AdminUser, session: Session) -> AllowedEmailOut:
+    email = body.email.strip().lower()
+    row = await session.scalar(select(AllowedEmail).where(func.lower(AllowedEmail.email) == email))
+    if row is None:
+        row = AllowedEmail(email=email)
+        session.add(row)
+        await session.commit()
+        await session.refresh(row)
+    signed_up = await session.scalar(select(User.id).where(func.lower(User.email) == email)) is not None
+    return AllowedEmailOut(email=row.email, created_at=row.created_at, signed_up=signed_up)
+
+
+@router.delete("/allowed-emails/{email}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_allowed(email: str, admin: AdminUser, session: Session) -> None:
+    """Stops future sign-ins only; an existing account stays until its data is deleted."""
+    if email.lower() == admin.email.lower():
+        raise api_error(status.HTTP_409_CONFLICT, "cannot_remove_self", "You can't remove yourself.")
+    row = await session.scalar(select(AllowedEmail).where(func.lower(AllowedEmail.email) == email.lower()))
+    if row is not None:
+        await session.delete(row)
+        await session.commit()

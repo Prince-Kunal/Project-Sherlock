@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import Company, Contact, Job, JobMatch, Outreach, OutreachEvent
 from app.models.enums import OutreachEventType, OutreachStatus
 from app.schemas.jobs import CompanyBrief, JobOut
-from app.schemas.outreach import ContactOut, OutreachDetail, OutreachListItem, OutreachOut
+from app.schemas.outreach import ContactOut, OutreachDetail, OutreachListItem, OutreachOut, TimelineEntry
 from app.schemas.resume import MasterResume
 from app.schemas.tailor import ResumeChange
 from app.services.email.style import style_issues
@@ -66,7 +66,37 @@ async def outreach_list_item(session: AsyncSession, outreach: Outreach) -> Outre
         job_title=job.title if job else None,
         fit_score=match.llm_score if match else None,
         updated_at=outreach.updated_at,
+        scheduled_at=outreach.scheduled_at,
+        sent_at=outreach.sent_at,
+        replied_at=outreach.replied_at,
+        outcome=outreach.outcome,
+        notes=outreach.notes,
+        is_followup=outreach.followup_count > 0,
+        send_error=await _send_error(session, outreach),
     )
+
+
+async def _send_error(session: AsyncSession, outreach: Outreach) -> str | None:
+    """The reason the last send came back to review, while it's waiting for a new approval."""
+    if outreach.status != OutreachStatus.PENDING_REVIEW:
+        return None
+    event = await session.scalar(
+        select(OutreachEvent)
+        .where(OutreachEvent.outreach_id == outreach.id)
+        .order_by(OutreachEvent.created_at.desc())
+        .limit(1)
+    )
+    if event is None or event.type != OutreachEventType.SEND_FAILED:
+        return None
+    first = await session.scalar(
+        select(OutreachEvent)
+        .where(OutreachEvent.outreach_id == outreach.id, OutreachEvent.type == OutreachEventType.SEND_FAILED)
+        .order_by(OutreachEvent.created_at.desc())
+        .offset(1)
+        .limit(1)
+    )
+    payload = (first or event).payload
+    return str(payload.get("message") or payload.get("reason") or "The send failed.")
 
 
 async def _match_for(session: AsyncSession, outreach: Outreach) -> JobMatch | None:
@@ -119,3 +149,58 @@ def _style_warnings(outreach: Outreach, job: Job | None) -> list[str]:
         bullets = [b.text for b in MasterResume.model_validate(resume).all_bullets()]
     sources = [job.description_text if job else "", *bullets]
     return [i.message for i in style_issues(outreach.subject or "", outreach.body, sources)]
+
+
+_TITLES = {
+    OutreachEventType.DRAFTED: "Draft written",
+    OutreachEventType.EDITED: "You edited the draft",
+    OutreachEventType.REGENERATED: "Draft rewritten",
+    OutreachEventType.APPROVED: "You approved it",
+    OutreachEventType.SKIPPED: "Skipped",
+    OutreachEventType.SCHEDULED: "Scheduled",
+    OutreachEventType.SENT: "Sent",
+    OutreachEventType.SEND_FAILED: "Send failed",
+    OutreachEventType.REPLY_DETECTED: "Reply received",
+    OutreachEventType.FOLLOWUP_DUE: "Follow-up due",
+    OutreachEventType.FOLLOWUP_DRAFTED: "Follow-up drafted",
+    OutreachEventType.FOLLOWUP_SENT: "Follow-up sent",
+    OutreachEventType.BOUNCED: "Bounced",
+    OutreachEventType.CLOSED: "Closed",
+    OutreachEventType.OUTCOME_SET: "Outcome set",
+    OutreachEventType.FAILED: "Drafting failed",
+    OutreachEventType.RETRIED: "Retried",
+    OutreachEventType.CONTACT_CHANGED: "Contact set",
+}
+
+
+async def outreach_timeline(session: AsyncSession, outreach: Outreach) -> list[TimelineEntry]:
+    events = (
+        await session.scalars(
+            select(OutreachEvent)
+            .where(OutreachEvent.outreach_id == outreach.id)
+            .order_by(OutreachEvent.created_at)
+        )
+    ).all()
+    entries = []
+    for event in events:
+        payload = event.payload or {}
+        if event.type == OutreachEventType.SEND_FAILED and payload.get("returned_to_review"):
+            continue  # the second half of one failure
+        text = None
+        if event.type in (OutreachEventType.SENT, OutreachEventType.FOLLOWUP_SENT):
+            text = payload.get("body")
+        elif event.type in (OutreachEventType.REPLY_DETECTED, OutreachEventType.BOUNCED):
+            text = payload.get("text") or payload.get("snippet")
+        entries.append(
+            TimelineEntry(
+                at=event.created_at,
+                type=event.type,
+                status=OutreachStatus(payload["to"])
+                if payload.get("to") in OutreachStatus._value2member_map_
+                else None,
+                title=_TITLES.get(event.type, event.type.value.replace("_", " ").capitalize()),
+                text=text,
+                reason=payload.get("reason") or payload.get("message"),
+            )
+        )
+    return entries

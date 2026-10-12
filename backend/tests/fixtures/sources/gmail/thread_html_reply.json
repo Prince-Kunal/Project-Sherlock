@@ -1,0 +1,103 @@
+{
+  "id": "18f2a0c0d1e2f300",
+  "historyId": "123500",
+  "messages": [
+    {
+      "id": "18f2a0c0d1e2f300",
+      "threadId": "18f2a0c0d1e2f300",
+      "labelIds": [
+        "SENT"
+      ],
+      "snippet": "Hi Priya, I&#39;m applying for the backend intern role and wanted to ask if you&#39;d refer me.",
+      "historyId": "123400",
+      "internalDate": "1791360000000",
+      "payload": {
+        "partId": "",
+        "mimeType": "multipart/mixed",
+        "filename": "",
+        "headers": [
+          {
+            "name": "From",
+            "value": "Rohan Das <rohan.das.dev@gmail.com>"
+          },
+          {
+            "name": "To",
+            "value": "priya@ledgerline.example"
+          },
+          {
+            "name": "Subject",
+            "value": "Backend intern role at Ledgerline"
+          },
+          {
+            "name": "Message-ID",
+            "value": "<172839.1@gmail.com>"
+          }
+        ],
+        "body": {
+          "size": 0
+        },
+        "parts": [
+          {
+            "partId": "0",
+            "mimeType": "text/plain",
+            "filename": "",
+            "headers": [],
+            "body": {
+              "size": 10,
+              "data": "SGkgUHJpeWEsCgpJJ20gYXBwbHlpbmcgZm9yIHRoZSBiYWNrZW5kIGludGVybiByb2xlIGFuZCB3YW50ZWQgdG8gYXNrIGlmIHlvdSdkIHJlZmVyIG1lLiBSZXN1bWUncyBhdHRhY2hlZC4KCklmIHRoaXMgaXNuJ3Qgc29tZXRoaW5nIHlvdSBjYW4gaGVscCB3aXRoLCBqdXN0IGxldCBtZSBrbm93IGFuZCBJIHdvbid0IGZvbGxvdyB1cC4KClRoYW5rcywKUm9oYW4gRGFz"
+            }
+          },
+          {
+            "partId": "1",
+            "mimeType": "application/pdf",
+            "filename": "Rohan_Das_Resume.pdf",
+            "headers": [],
+            "body": {
+              "attachmentId": "ANGjdJ9",
+              "size": 51788
+            }
+          }
+        ]
+      },
+      "sizeEstimate": 70000
+    },
+    {
+      "id": "18f2a6",
+      "threadId": "18f2a0c0d1e2f300",
+      "labelIds": [
+        "INBOX"
+      ],
+      "snippet": "",
+      "historyId": "123456",
+      "internalDate": "1791369000000",
+      "payload": {
+        "partId": "",
+        "mimeType": "text/html",
+        "filename": "",
+        "headers": [
+          {
+            "name": "From",
+            "value": "Priya Nair <priya@ledgerline.example>"
+          },
+          {
+            "name": "To",
+            "value": "rohan.das.dev@gmail.com"
+          },
+          {
+            "name": "Subject",
+            "value": "Re: Backend intern role at Ledgerline"
+          },
+          {
+            "name": "Message-ID",
+            "value": "<18f2a6@mail.example>"
+          }
+        ],
+        "body": {
+          "size": 80,
+          "data": "PGRpdj5TdXJlLCBJJiMzOTtsbCBwYXNzIGl0IG9uIHRvIG91ciBoaXJpbmcgbWFuYWdlci48YnI-PC9kaXY-"
+        }
+      },
+      "sizeEstimate": 4096
+    }
+  ]
+}

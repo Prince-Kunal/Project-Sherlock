@@ -149,7 +149,7 @@ export type Contact = {
   email: string;
   role_category: "founder" | "eng_manager" | "engineer" | "recruiter" | "other";
   verification_status: VerificationStatus;
-  email_source: "hunter" | "apollo" | "manual" | "pattern" | "hn";
+  email_source: "hunter" | "apollo" | "manual" | "pattern" | "hn" | "fake";
 };
 
 export type Outreach = {
@@ -235,11 +235,21 @@ export type OutreachStatus =
   | "closed";
 
 /** A row in the review queue (mirrors backend OutreachListItem). */
+export type Outcome =
+  "none" | "referred" | "interview" | "rejected" | "not_hiring";
+
 export type OutreachListItem = Outreach & {
   subject: string | null;
   job_title: string | null;
   fit_score: number | null;
   updated_at: string;
+  scheduled_at: string | null;
+  sent_at: string | null;
+  replied_at: string | null;
+  outcome: Outcome;
+  notes: string;
+  is_followup: boolean;
+  send_error: string | null;
 };
 
 export type OutreachList = { items: OutreachListItem[]; total: number };
@@ -270,4 +280,31 @@ export type ReviewStats = {
   replies: number;
   followups_due: number;
   failed: number;
+};
+
+export type TimelineEntry = {
+  at: string;
+  type: string;
+  status: OutreachStatus | null;
+  title: string;
+  text: string | null;
+  reason: string | null;
+};
+
+export type GmailStatus = {
+  connected: boolean;
+  email: string;
+  needs_reauth: boolean;
+  missing_permissions: boolean;
+  connected_at: string | null;
+  paused: boolean;
+  google_sign_in: boolean;
+};
+
+export type AuthConfig = { dev_login: boolean; google: boolean };
+
+export type AllowedEmail = {
+  email: string;
+  created_at: string;
+  signed_up: boolean;
 };

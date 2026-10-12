@@ -16,7 +16,7 @@ from app.api.errors import api_error, llm_errors
 from app.core.auth import CurrentUser
 from app.core.db import get_session
 from app.models import Job, JobMatch, Outreach
-from app.models.enums import JobMatchStatus, OutreachEventType, OutreachStatus
+from app.models.enums import JobMatchStatus, Outcome, OutreachEventType, OutreachStatus
 from app.schemas.outreach import (
     BuildQueued,
     DraftEditIn,
@@ -25,9 +25,11 @@ from app.schemas.outreach import (
     OutreachList,
     RegenerateIn,
     ReviewStats,
+    TimelineEntry,
+    TrackingIn,
 )
 from app.services.contacts.service import ManualContactError, ProviderFactory, set_contact_manually
-from app.services.contacts.views import outreach_detail, outreach_list_item
+from app.services.contacts.views import outreach_detail, outreach_list_item, outreach_timeline
 from app.services.email.drafter import MAX_EDIT_WORDS, DraftError, check_text, replace_greeting
 from app.services.email.pipeline import DraftingPausedError, DraftPipeline, pdf_for
 from app.services.email.state import InvalidTransitionError, record_event, transition
@@ -77,6 +79,7 @@ async def list_outreach(
     user: CurrentUser,
     session: Session,
     outreach_status: Annotated[list[OutreachStatus] | None, Query(alias="status")] = None,
+    outcome: Annotated[list[Outcome] | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> OutreachList:
@@ -85,6 +88,8 @@ async def list_outreach(
     conditions = [Outreach.user_id == user.id]
     if outreach_status:
         conditions.append(Outreach.status.in_(outreach_status))
+    if outcome:
+        conditions.append(Outreach.outcome.in_(outcome))
     order = (
         Outreach.created_at
         if outreach_status == [OutreachStatus.PENDING_REVIEW]
@@ -286,6 +291,62 @@ async def run_pipeline(
                 raise exc.cause from exc
     finally:
         await session.commit()  # the contact found and the usage rows are kept either way
+
+
+@router.post("/{outreach_id}/unapprove", response_model=OutreachDetail)
+async def unapprove(outreach_id: uuid.UUID, user: CurrentUser, session: Session) -> OutreachDetail:
+    """Pull an approved or scheduled email back to review before it goes out."""
+    outreach = await _owned(session, user.id, outreach_id)
+    if outreach.status not in (OutreachStatus.APPROVED, OutreachStatus.SCHEDULED):
+        raise api_error(
+            status.HTTP_409_CONFLICT, "not_approved", "Only approved emails that haven't gone out yet."
+        )
+    outreach.scheduled_at = None
+    await transition(
+        session, outreach, OutreachStatus.PENDING_REVIEW, actor_id=user.id, event=OutreachEventType.EDITED,
+        payload={"unapproved": True},
+    )  # fmt: skip
+    await session.commit()
+    return await outreach_detail(session, outreach)
+
+
+@router.patch("/{outreach_id}/tracking", response_model=OutreachDetail)
+async def set_tracking(
+    outreach_id: uuid.UUID, body: TrackingIn, user: CurrentUser, session: Session
+) -> OutreachDetail:
+    """Outcome (referred, interview, …) and private notes, for any outreach."""
+    outreach = await _owned(session, user.id, outreach_id)
+    if body.outcome is not None and body.outcome != outreach.outcome:
+        await record_event(
+            session,
+            outreach,
+            OutreachEventType.OUTCOME_SET,
+            {"before": outreach.outcome.value, "outcome": body.outcome.value, "actor": str(user.id)},
+        )
+        outreach.outcome = body.outcome
+    if body.notes is not None:
+        outreach.notes = body.notes
+    await session.commit()
+    return await outreach_detail(session, outreach)
+
+
+@router.post("/{outreach_id}/close", response_model=OutreachDetail)
+async def close(outreach_id: uuid.UUID, user: CurrentUser, session: Session) -> OutreachDetail:
+    """Close a sent or replied outreach by hand (e.g. no follow-up wanted)."""
+    outreach = await _owned(session, user.id, outreach_id)
+    try:
+        await transition(
+            session, outreach, OutreachStatus.CLOSED, actor_id=user.id, payload={"reason": "manual"}
+        )
+    except InvalidTransitionError as exc:
+        raise api_error(status.HTTP_409_CONFLICT, "cannot_close", str(exc)) from exc
+    await session.commit()
+    return await outreach_detail(session, outreach)
+
+
+@router.get("/{outreach_id}/timeline", response_model=list[TimelineEntry])
+async def timeline(outreach_id: uuid.UUID, user: CurrentUser, session: Session) -> list[TimelineEntry]:
+    return await outreach_timeline(session, await _owned(session, user.id, outreach_id))
 
 
 @router.get("/{outreach_id}/resume.pdf", response_class=FileResponse)

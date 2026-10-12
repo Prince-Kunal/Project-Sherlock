@@ -57,6 +57,18 @@ export function DraftCard({
   return (
     <article className="bg-card flex flex-col gap-4 rounded-xl border p-4">
       <JobHeader draft={draft} />
+      {draft.send_error && (
+        <p className="border-destructive/40 bg-destructive/5 text-destructive rounded-lg border p-3 text-sm">
+          The last send didn&apos;t go out: {draft.send_error} Fix it and
+          approve again.
+        </p>
+      )}
+      {draft.is_followup && (
+        <p className="text-muted-foreground text-sm">
+          Follow-up: goes in the same thread as your first email, without the
+          resume.
+        </p>
+      )}
       <ContactBlock draft={draft} editable={inReview} />
 
       {editing ? (
@@ -128,10 +140,13 @@ export function DraftCard({
           )}
         </div>
       )}
-      {draft.status === "approved" && (
+      {(draft.status === "approved" || draft.status === "scheduled") && (
         <p className="flex items-center gap-1.5 border-t pt-3 text-sm text-emerald-700 dark:text-emerald-400">
-          <CheckCircle2 className="size-4" /> Approved. It will be sent in your
-          send window once Gmail sending is set up (Phase 7).
+          <CheckCircle2 className="size-4" /> Approved.{" "}
+          {draft.scheduled_at
+            ? `Goes out around ${new Date(draft.scheduled_at).toLocaleString(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit" })}.`
+            : "It gets a send slot within 5 minutes."}{" "}
+          Change your mind in the Outreach tracker.
         </p>
       )}
     </article>
@@ -251,6 +266,12 @@ function ContactBlock({
           </Button>
         )}
       </div>
+      {contact.email_source === "fake" && (
+        <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+          Made-up contact from the fake Hunter (USE_FAKES=true). With real
+          sending on, Sherlock won&apos;t email it; change the contact first.
+        </p>
+      )}
       {changing && (
         <ManualContactForm
           outreachId={draft.id}

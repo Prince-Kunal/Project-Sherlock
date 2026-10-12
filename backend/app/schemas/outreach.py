@@ -6,7 +6,15 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from app.models.enums import CampaignType, EmailSource, OutreachStatus, RoleCategory, VerificationStatus
+from app.models.enums import (
+    CampaignType,
+    EmailSource,
+    Outcome,
+    OutreachEventType,
+    OutreachStatus,
+    RoleCategory,
+    VerificationStatus,
+)
 from app.schemas.jobs import CompanyBrief, JobOut
 from app.schemas.tailor import ResumeChange
 from app.services.resume.ats_check import AtsReport, KeywordCoverage
@@ -78,6 +86,13 @@ class OutreachListItem(OutreachOut):
     job_title: str | None
     fit_score: int | None
     updated_at: datetime
+    scheduled_at: datetime | None
+    sent_at: datetime | None
+    replied_at: datetime | None
+    outcome: Outcome
+    notes: str
+    is_followup: bool
+    send_error: str | None  # why the last send attempt came back to review, if it did
 
 
 class OutreachDetail(OutreachListItem):
@@ -124,3 +139,17 @@ class ReviewStats(BaseModel):
 
 class BuildQueued(BaseModel):
     queued: bool
+
+
+class TrackingIn(BaseModel):
+    outcome: Outcome | None = None
+    notes: str | None = Field(None, max_length=5000)
+
+
+class TimelineEntry(BaseModel):
+    at: datetime
+    type: OutreachEventType
+    status: OutreachStatus | None  # the status moved to, for status changes
+    title: str
+    text: str | None = None  # the email sent, or the reply received
+    reason: str | None = None

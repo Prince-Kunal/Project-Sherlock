@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -69,6 +69,12 @@ class OutreachEvent(UserOwnedBase):
     """Append-only audit log. Never update or delete rows (except via full user-data deletion)."""
 
     __tablename__ = "outreach_events"
+
+    # clock_timestamp(), not now(): events written in one transaction stay strictly ordered, which the
+    # send-time approval check relies on (an approval must be newer than the last edit).
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.clock_timestamp()
+    )
 
     outreach_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("outreach.id", ondelete="CASCADE"), index=True)
     type: Mapped[OutreachEventType] = mapped_column(str_enum(OutreachEventType, "outreach_event_type"))

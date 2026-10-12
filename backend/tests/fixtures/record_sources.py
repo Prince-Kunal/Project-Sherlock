@@ -156,5 +156,77 @@ def record_hunter() -> None:
     print("credits after recording:", account)
 
 
+def _scrub(value: Any, swaps: dict[str, str]) -> Any:
+    """Replace real addresses and names everywhere, including inside base64url message bodies."""
+    import base64
+
+    def text(t: str) -> str:
+        for real, fake in swaps.items():
+            t = re.sub(re.escape(real), fake, t, flags=re.IGNORECASE)
+        return t
+
+    if isinstance(value, dict):
+        out = {}
+        for k, v in value.items():
+            if k == "data" and isinstance(v, str):
+                decoded = base64.urlsafe_b64decode(v + "=" * (-len(v) % 4)).decode("utf-8", "replace")
+                out[k] = base64.urlsafe_b64encode(text(decoded).encode()).decode().rstrip("=")
+            else:
+                out[k] = _scrub(v, swaps)
+        return out
+    if isinstance(value, list):
+        return [_scrub(v, swaps) for v in value]
+    return text(value) if isinstance(value, str) else value
+
+
+def record_gmail() -> None:
+    """A real Gmail thread as a fixture, anonymised (PLAN.md Phase 7 manual test, docs/MANUAL_TESTS.md).
+
+        uv run python -m tests.fixtures.record_sources gmail <outreach_id> <fixture_name>
+
+    Reads the outreach's owner and thread from the app database and calls Gmail with their stored
+    authorisation (needs DATABASE_URL, FERNET_KEY, GOOGLE_CLIENT_ID/SECRET). Addresses and names of
+    both people are replaced with the fixture persons'; attachments aren't downloaded."""
+    import asyncio
+    import uuid
+
+    from app.core.db import get_sessionmaker
+    from app.core.redis import get_redis
+    from app.models import Contact, Outreach, User
+    from app.services.email.connection import GmailAccess
+    from app.services.registry import get_google_oauth
+
+    outreach_id, name = uuid.UUID(sys.argv[2]), sys.argv[3]
+
+    async def run() -> None:
+        async with get_sessionmaker()() as session:
+            outreach = await session.get(Outreach, outreach_id)
+            if outreach is None or outreach.gmail_thread_id is None:
+                raise SystemExit("no sent outreach with that id")
+            user = await session.get(User, outreach.user_id)
+            contact = await session.get(Contact, outreach.contact_id) if outreach.contact_id else None
+            oauth = get_google_oauth()
+            if user is None or contact is None or oauth is None:
+                raise SystemExit("missing user, contact or Google OAuth settings")
+            client = await GmailAccess(oauth, get_redis())(session, user)
+            data = await client._request(
+                "GET", f"threads/{outreach.gmail_thread_id}", params={"format": "full"}
+            )  # type: ignore[attr-defined]
+        swaps = {
+            user.email: "rohan.das.dev@gmail.com",
+            contact.email: "priya@ledgerline.example",
+            contact.full_name: "Priya Nair",
+            user.name: "Rohan Das",
+        }
+        scrubbed = _scrub(data, {k: v for k, v in swaps.items() if k})
+        text = json.dumps(scrubbed)
+        if any(k and k.lower() in text.lower() for k in swaps if "@" in k):
+            raise SystemExit("a real address survived the scrub; nothing saved")
+        save(f"gmail/{name}.json", scrubbed)
+
+    asyncio.run(run())
+
+
 if __name__ == "__main__":
-    {"adzuna": record_adzuna, "hunter": record_hunter}.get(sys.argv[1] if sys.argv[1:] else "", main)()
+    modes = {"adzuna": record_adzuna, "hunter": record_hunter, "gmail": record_gmail}
+    modes.get(sys.argv[1] if sys.argv[1:] else "", main)()
