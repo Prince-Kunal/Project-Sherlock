@@ -494,6 +494,8 @@ async def test_list_and_stats(with_hunter_key: AsyncClient, drafted: dict[str, A
         "replies": 0,
         "followups_due": 0,
         "failed": 0,
+        "new_company_matches": 0,
+        "by_mode": {"job": {"sent": 0, "replied": 0}, "open": {"sent": 0, "replied": 0}},
     }
 
 

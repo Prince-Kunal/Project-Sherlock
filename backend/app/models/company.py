@@ -7,6 +7,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -48,6 +49,10 @@ class Company(TimestampedBase):
     )
     employee_count: Mapped[int | None] = mapped_column(Integer)
     industry: Mapped[str | None] = mapped_column(String(200))
+    # Phase 8: the company directory's industries and tags (lowercase), and every place it lists
+    # (offices, and regions such as "Remote"), for the open-outreach target filters.
+    industry_tags: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default="{}")
+    locations: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default="{}")
     hq_location: Mapped[str | None] = mapped_column(String(200))
     description: Mapped[str | None] = mapped_column(Text)
     website_text: Mapped[str | None] = mapped_column(Text)
@@ -71,6 +76,7 @@ class ProspectTarget(UserOwnedBase):
     __tablename__ = "prospect_targets"
 
     name: Mapped[str] = mapped_column(String(200))
+    target_roles: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default="{}")  # e.g. "ML intern"
     contact_titles: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default="{}")
     industries: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default="{}")
     locations: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default="{}")
@@ -92,6 +98,8 @@ class CompanyMatch(UserOwnedBase):
         ForeignKey("prospect_targets.id", ondelete="SET NULL"), index=True
     )
     score: Mapped[int] = mapped_column(Integer)
+    embedding_score: Mapped[float | None] = mapped_column(Float)
+    angle: Mapped[str] = mapped_column(Text, server_default="")  # why this user fits this company
     reasoning: Mapped[str] = mapped_column(Text, server_default="")
     status: Mapped[CompanyMatchStatus] = mapped_column(
         str_enum(CompanyMatchStatus, "company_match_status"), server_default=CompanyMatchStatus.NEW.value

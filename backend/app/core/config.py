@@ -58,12 +58,16 @@ class Settings(BaseSettings):
     match_batch_size: int = 10
     match_candidates_per_run: int = 50
     match_daily_llm_calls: int = 6
+    # Open outreach (PLAN.md Phase 8): companies are scored the same way, under a smaller allowance.
+    company_match_batch_size: int = 8
+    company_candidates_per_run: int = 24
+    company_match_daily_llm_calls: int = 3
+    company_min_sim: float = 0.0  # rank by similarity only; the LLM decides
 
     hn_enabled: bool = True  # parse HN "Who is hiring" with the owner's key (needs GEMINI_API_KEY)
 
     hunter_api_key: str = ""  # owner's key; used for other users only if the fallback below is on
     allow_owner_hunter_fallback: bool = False
-    apollo_api_key: str = ""
     adzuna_app_id: str = ""
     adzuna_app_key: str = ""
 

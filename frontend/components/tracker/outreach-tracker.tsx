@@ -1,21 +1,31 @@
 "use client";
 
+import { EmptyState } from "@/components/empty-state";
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ListSkeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { errorMessage } from "@/lib/api";
+import { CANON } from "@/lib/canon";
 import { selectClass } from "@/lib/jobs";
 import {
   useOutreachDetail,
   useOutreachList,
   useReviewAction,
+  useReviewStats,
   useSetTracking,
   useTimeline,
 } from "@/lib/queries";
-import type { Outcome, OutreachListItem, OutreachStatus } from "@/lib/types";
+import type {
+  CampaignType,
+  Outcome,
+  OutreachListItem,
+  OutreachStatus,
+  ReviewStats,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type Filter = {
@@ -80,54 +90,100 @@ function ago(iso: string): string {
   return `${Math.round(hours / 24)} d ago`;
 }
 
+const MODE_LABELS: Record<CampaignType, string> = {
+  job: "Job-linked",
+  open: "Open outreach",
+};
+
+/** Reply rate per mode: is reaching out without a posting paying off? */
+function ReplyRates({ stats }: { stats: ReviewStats }) {
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {(["job", "open"] as const).map((mode) => {
+        const { sent, replied } = stats.by_mode[mode];
+        return (
+          <div
+            key={mode}
+            className="bg-surface ring-foreground/[0.07] shadow-soft rounded-2xl px-5 py-4 ring-1"
+          >
+            <p className="text-muted-foreground text-xs">{MODE_LABELS[mode]}</p>
+            <p className="text-lg font-semibold tabular-nums">
+              {sent ? `${Math.round((replied / sent) * 100)}%` : "–"}{" "}
+              <span className="text-muted-foreground text-sm font-normal">
+                reply rate · {replied} of {sent} sent
+              </span>
+            </p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function OutreachTracker() {
   const [filter, setFilter] = useState<Filter>(FILTERS[0]);
+  const [mode, setMode] = useState<CampaignType | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
-  const list = useOutreachList(filter.statuses, filter.outcomes);
+  const list = useOutreachList(filter.statuses, filter.outcomes, mode);
+  const stats = useReviewStats();
   const items = list.data?.items ?? [];
 
   return (
     <div className="flex flex-col gap-4">
-      <div
-        role="tablist"
-        aria-label="Outreach status"
-        className="flex flex-wrap gap-1"
-      >
-        {FILTERS.map((f) => (
-          <button
-            key={f.key}
-            role="tab"
-            type="button"
-            aria-selected={f.key === filter.key}
-            onClick={() => setFilter(f)}
-            className={cn(
-              "rounded-full border px-3 py-1 text-sm transition-colors",
-              f.key === filter.key
-                ? "bg-foreground text-background border-foreground"
-                : "hover:bg-muted",
-            )}
-          >
-            {f.label}
-          </button>
-        ))}
+      {stats.data && <ReplyRates stats={stats.data} />}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div
+          role="tablist"
+          aria-label="Outreach status"
+          className="flex flex-wrap gap-1"
+        >
+          {FILTERS.map((f) => (
+            <button
+              key={f.key}
+              role="tab"
+              type="button"
+              aria-selected={f.key === filter.key}
+              onClick={() => setFilter(f)}
+              className={cn(
+                "rounded-full border px-3 py-1 text-sm transition-colors",
+                f.key === filter.key
+                  ? "bg-foreground text-background border-foreground"
+                  : "hover:bg-muted",
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <select
+          aria-label="Mode"
+          className={selectClass}
+          value={mode ?? ""}
+          onChange={(e) =>
+            setMode((e.target.value || null) as CampaignType | null)
+          }
+        >
+          <option value="">Both modes</option>
+          <option value="job">Job-linked</option>
+          <option value="open">Open outreach</option>
+        </select>
       </div>
 
       {list.isError && (
         <p className="text-destructive text-sm">{errorMessage(list.error)}</p>
       )}
-      {list.isPending && (
-        <p className="text-muted-foreground py-10 text-center text-sm">
-          Loading…
-        </p>
-      )}
+      {list.isPending && <ListSkeleton />}
       {list.data && items.length === 0 && (
-        <div className="text-muted-foreground rounded-xl border border-dashed px-4 py-10 text-center text-sm">
-          Nothing here yet.
-        </div>
+        <EmptyState title="No cases here yet." quote={CANON.obvious}>
+          <p>
+            Emails you approve show up here as they&apos;re scheduled, sent and
+            answered.
+          </p>
+        </EmptyState>
       )}
 
       {items.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border">
+        <div className="bg-surface ring-foreground/[0.07] shadow-soft overflow-x-auto rounded-2xl ring-1">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-muted-foreground text-left text-xs">
               <tr>
@@ -181,7 +237,10 @@ function Row({
       tabIndex={0}
     >
       <td className="px-3 py-2 font-medium">{item.company.name}</td>
-      <td className="max-w-56 truncate px-3 py-2">{item.job_title ?? "–"}</td>
+      <td className="max-w-56 truncate px-3 py-2">
+        {item.job_title ??
+          (item.campaign_type === "open" ? "Open outreach" : "–")}
+      </td>
       <td className="hidden px-3 py-2 md:table-cell">
         {item.contact?.full_name ?? "–"}
       </td>

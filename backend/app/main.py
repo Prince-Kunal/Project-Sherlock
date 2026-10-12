@@ -13,6 +13,7 @@ from app.api.routes import (
     matches,
     outreach,
     preferences,
+    prospects,
     resume,
     settings,
 )
@@ -49,6 +50,7 @@ def create_app() -> FastAPI:
     app.include_router(matches.router)
     app.include_router(companies.router)
     app.include_router(outreach.router)
+    app.include_router(prospects.router)
     app.include_router(admin.router)
     return app
 

@@ -46,6 +46,8 @@ class FakeContactProvider(ContactProvider):
         headcount: str | None = "11-50",
         rejected: bool = False,
         resolve_names: bool = True,
+        name: str = "fake",
+        can_verify: bool = True,
     ) -> None:
         """`resolve_names=False` doesn't report a domain for name-only searches, so a fake run
         against a real dev database never writes made-up domains onto companies."""
@@ -53,14 +55,18 @@ class FakeContactProvider(ContactProvider):
         self.headcount = headcount
         self.rejected = rejected
         self.resolve_names = resolve_names
+        self.name = name  # "apollo" or "hunter" to stand in for one in a waterfall test
+        self.can_verify = can_verify
         self.calls: list[tuple[str, tuple[str, ...]]] = []
 
     def _check(self) -> None:
         if self.rejected:
             raise ContactProviderAuthError("fake: key rejected")
 
-    async def search_people(self, *, domain: str | None = None, company: str | None = None) -> PeopleSearch:
-        self.calls.append(("search_people", (domain or "", company or "")))
+    async def search_people(
+        self, *, domain: str | None = None, company: str | None = None, titles: list[str] | None = None
+    ) -> PeopleSearch:
+        self.calls.append(("search_people", (domain or "", company or "", *(titles or []))))
         self._check()
         reported = domain or (self._slug(company) if self.resolve_names else None)
         domain = domain or self._slug(company)

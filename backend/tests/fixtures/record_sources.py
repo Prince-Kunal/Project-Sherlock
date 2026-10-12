@@ -227,6 +227,38 @@ def record_gmail() -> None:
     asyncio.run(run())
 
 
+YC_FIELDS = (
+    "name", "slug", "website", "one_liner", "long_description", "team_size", "industry", "subindustry",
+    "industries", "tags", "regions", "all_locations", "status", "stage", "isHiring", "nonprofit",
+)  # fmt: skip
+
+
+def record_yc() -> None:
+    """A slice of the public YC directory (company data only, no people): small and mid-size Indian
+    companies, remote-first ones, US-only ones, an inactive one and one without a website."""
+    from app.services.prospects.yc import YC_DIRECTORY_URL
+
+    data = httpx.Client(timeout=120, headers=HEADERS).get(YC_DIRECTORY_URL).json()
+    by_slug = sorted(data, key=lambda c: c["slug"])
+
+    def pick(test: Any, n: int) -> list[dict[str, Any]]:
+        return [c for c in by_slug if test(c)][:n]
+
+    def india(c: dict[str, Any]) -> bool:
+        return "India" in (c.get("regions") or [])
+
+    active = [c for c in by_slug if c.get("status") == "Active" and c.get("website")]
+    chosen = (
+        pick(lambda c: c in active and india(c) and (c.get("team_size") or 0) <= 50, 4)
+        + pick(lambda c: c in active and india(c) and 50 < (c.get("team_size") or 0) <= 500, 2)
+        + pick(lambda c: c in active and "Fully Remote" in c["regions"] and not india(c), 3)
+        + pick(lambda c: c in active and c["regions"] == ["United States of America", "America / Canada"], 2)
+        + pick(lambda c: c.get("status") == "Inactive" and india(c), 1)
+        + pick(lambda c: not c.get("website") and c.get("status") == "Active", 1)
+    )
+    save("yc/companies.json", [{k: c.get(k) for k in YC_FIELDS} for c in chosen])
+
+
 if __name__ == "__main__":
-    modes = {"adzuna": record_adzuna, "hunter": record_hunter, "gmail": record_gmail}
+    modes = {"adzuna": record_adzuna, "hunter": record_hunter, "gmail": record_gmail, "yc": record_yc}
     modes.get(sys.argv[1] if sys.argv[1:] else "", main)()

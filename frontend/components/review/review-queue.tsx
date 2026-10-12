@@ -5,9 +5,12 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { FAILURE_LABELS } from "@/components/jobs/contact-panel";
-import { DraftCard, scoreClass } from "@/components/review/draft-card";
+import { DraftCard } from "@/components/review/draft-card";
+import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
+import { ListSkeleton, Skeleton } from "@/components/ui/skeleton";
 import { errorMessage } from "@/lib/api";
+import { CANON } from "@/lib/canon";
 import {
   useBuildDrafts,
   useOutreachDetail,
@@ -16,6 +19,7 @@ import {
   useReviewStats,
 } from "@/lib/queries";
 import type { OutreachListItem, ReviewStats } from "@/lib/types";
+import { scoreClass } from "@/lib/score";
 import { cn } from "@/lib/utils";
 
 const MORE_FAILURE_LABELS: Record<string, string> = {
@@ -25,6 +29,8 @@ const MORE_FAILURE_LABELS: Record<string, string> = {
   draft_validation_failed: "The email failed validation twice",
   llm_output_invalid: "The AI returned an unusable answer",
   no_resume: "Upload your resume first",
+  no_company_context: "Nothing to quote from the company's site yet",
+  missing_inputs: "Its job or company match no longer exists",
 };
 
 function failureLabel(reason: string | null): string {
@@ -92,16 +98,12 @@ export function ReviewQueue() {
           {errorMessage(pending.error)}
         </p>
       )}
-      {pending.isPending && (
-        <p className="text-muted-foreground py-10 text-center text-sm">
-          Loading…
-        </p>
-      )}
+      {pending.isPending && <ListSkeleton rows={3} label="Loading drafts" />}
 
       {pending.data && items.length === 0 && <EmptyQueue />}
 
       {items.length > 0 && (
-        <div className="grid items-start gap-4 lg:grid-cols-[17rem_1fr]">
+        <div className="grid items-start gap-5 lg:grid-cols-[17rem_1fr]">
           <nav aria-label="Drafts waiting for review">
             <ul className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible">
               {items.map((item) => (
@@ -131,9 +133,15 @@ export function ReviewQueue() {
                 {errorMessage(detail.error)}
               </p>
             ) : (
-              <p className="text-muted-foreground py-10 text-center text-sm">
-                Loading draft…
-              </p>
+              <div
+                role="status"
+                aria-label="Loading draft"
+                className="bg-card flex flex-col gap-4 rounded-2xl border p-6"
+              >
+                <Skeleton className="h-6 w-1/2" />
+                <Skeleton className="h-4 w-1/3" />
+                <Skeleton className="h-40 w-full rounded-xl" />
+              </div>
             )}
           </div>
         </div>
@@ -147,7 +155,11 @@ export function ReviewQueue() {
 function StatCards({ stats }: { stats: ReviewStats }) {
   const cards = [
     { label: "Waiting for review", value: stats.pending_review },
-    { label: "New matches", value: stats.new_matches, href: "/jobs" },
+    {
+      label: "New matches",
+      value: stats.new_matches + stats.new_company_matches,
+      href: stats.new_matches ? "/jobs" : "/targets",
+    },
     {
       label: "Sent this week",
       value: stats.sent_this_week,
@@ -157,36 +169,38 @@ function StatCards({ stats }: { stats: ReviewStats }) {
     { label: "Follow-ups due", value: stats.followups_due },
   ];
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+    <dl className="bg-surface ring-foreground/[0.07] shadow-soft [&>*]:border-border grid grid-cols-2 overflow-hidden rounded-2xl ring-1 sm:grid-cols-3 lg:grid-cols-5 [&>*]:border-b [&>*]:sm:border-r lg:[&>*]:border-b-0 lg:[&>*:last-child]:border-r-0">
       {cards.map((card) => {
         const content = (
           <>
-            <p className="text-muted-foreground text-xs">{card.label}</p>
-            <p className="text-2xl font-semibold tabular-nums">
-              {card.value}
+            <dt className="text-muted-foreground text-xs">{card.label}</dt>
+            <dd className="mt-1 flex items-baseline gap-2">
+              <span className="tabular font-mono text-3xl font-semibold tracking-tight">
+                {card.value}
+              </span>
               {card.note && (
-                <span className="text-muted-foreground ml-1.5 text-xs font-normal">
+                <span className="text-muted-foreground text-xs">
                   {card.note}
                 </span>
               )}
-            </p>
+            </dd>
           </>
         );
         return card.href ? (
           <Link
             key={card.label}
             href={card.href}
-            className="bg-card hover:bg-muted/40 rounded-xl border px-3 py-2 transition-colors"
+            className="hover:bg-muted/50 px-5 py-4 transition-colors duration-200"
           >
             {content}
           </Link>
         ) : (
-          <div key={card.label} className="bg-card rounded-xl border px-3 py-2">
+          <div key={card.label} className="px-5 py-4">
             {content}
           </div>
         );
       })}
-    </div>
+    </dl>
   );
 }
 
@@ -206,13 +220,13 @@ function QueueItem({
         onClick={onSelect}
         aria-current={active ? "true" : undefined}
         className={cn(
-          "flex w-56 items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-sm transition-colors lg:w-full",
-          active ? "border-foreground bg-muted/50" : "hover:bg-muted/30",
+          "flex w-56 items-center gap-3 rounded-2xl px-2.5 py-2.5 text-left text-sm transition-[background-color,box-shadow] duration-200 lg:w-full",
+          active
+            ? "bg-surface shadow-soft ring-brand/45 ring-1"
+            : "hover:bg-muted/60",
         )}
       >
-        <span
-          className={`flex size-8 shrink-0 items-center justify-center rounded-md text-xs font-semibold tabular-nums ${scoreClass(item.fit_score)}`}
-        >
+        <span className={`size-8 text-xs ${scoreClass(item.fit_score)}`}>
           {item.fit_score ?? "–"}
         </span>
         <span className="min-w-0">
@@ -220,7 +234,9 @@ function QueueItem({
             {item.company.name}
           </span>
           <span className="text-muted-foreground block truncate text-xs">
-            {item.job_title ?? item.subject}
+            {item.campaign_type === "open"
+              ? `Open outreach${item.is_followup ? " · follow-up" : ""}`
+              : (item.job_title ?? item.subject)}
           </span>
         </span>
       </button>
@@ -231,40 +247,46 @@ function QueueItem({
 function EmptyQueue() {
   const build = useBuildDrafts();
   return (
-    <div className="text-muted-foreground flex flex-col items-center gap-3 rounded-xl border border-dashed px-4 py-10 text-center text-sm">
+    <EmptyState
+      title="No drafts waiting."
+      quote={CANON.clay}
+      actions={
+        <>
+          <Button
+            variant="brand"
+            disabled={build.isPending || build.isSuccess}
+            onClick={() => build.mutate()}
+          >
+            <Sparkles />
+            {build.isSuccess
+              ? build.data.queued
+                ? "Drafting started"
+                : "Already running"
+              : "Draft today's batch now"}
+          </Button>
+          <Link
+            href="/jobs"
+            className="text-muted-foreground hover:text-foreground px-2 text-sm underline-offset-4 hover:underline"
+          >
+            Pick a match yourself
+          </Link>
+        </>
+      }
+    >
       <p>
-        No drafts waiting. Sherlock drafts your best matches every morning at
-        07:00, up to your daily batch size.
+        Sherlock drafts your best matches every morning at 07:00, up to your
+        daily batch size.
       </p>
-      <Button
-        variant="outline"
-        disabled={build.isPending || build.isSuccess}
-        onClick={() => build.mutate()}
-      >
-        <Sparkles />
-        {build.isSuccess
-          ? build.data.queued
-            ? "Drafting started"
-            : "Already running"
-          : "Draft today's batch now"}
-      </Button>
       {build.isSuccess && build.data.queued && (
-        <p>
-          Each draft takes about half a minute (finding a contact, tailoring
-          your resume, writing the email). Reload in a few minutes.
+        <p className="mt-2">
+          Each draft takes about half a minute: a contact, a tailored resume,
+          then the email. Reload in a few minutes.
         </p>
       )}
       {build.isError && (
-        <p className="text-destructive">{errorMessage(build.error)}</p>
+        <p className="text-destructive mt-2">{errorMessage(build.error)}</p>
       )}
-      <p>
-        Or pick a match on the{" "}
-        <Link href="/jobs" className="underline underline-offset-4">
-          Jobs
-        </Link>{" "}
-        page and click “Draft now”.
-      </p>
-    </div>
+    </EmptyState>
   );
 }
 
@@ -277,16 +299,22 @@ function NeedsAttention() {
 
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium">Needs attention</h2>
+      <h2 className="mt-4 text-lg font-semibold tracking-tight">
+        Needs attention
+      </h2>
       <ul className="flex flex-col gap-2">
         {items.map((item) => (
           <li
             key={item.id}
-            className="bg-card flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-sm"
+            className="bg-card ring-destructive/20 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-3 text-sm ring-1"
           >
             <div className="min-w-0">
               <p className="font-medium">
-                {item.job_title ?? "Outreach"} · {item.company.name}
+                {item.job_title ??
+                  (item.campaign_type === "open"
+                    ? "Open outreach"
+                    : "Outreach")}{" "}
+                · {item.company.name}
               </p>
               <p className="text-muted-foreground">
                 {failureLabel(item.failure_reason)}

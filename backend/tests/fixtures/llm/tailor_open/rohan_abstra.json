@@ -1,0 +1,49 @@
+[
+  {
+    "section_order": [
+      "experience",
+      "projects",
+      "skills",
+      "education",
+      "achievements"
+    ],
+    "selected_bullet_ids": [
+      "exp1-b1",
+      "proj1-b1",
+      "proj1-b2",
+      "proj2-b1",
+      "proj2-b2",
+      "exp1-b2",
+      "exp2-b1",
+      "exp2-b2",
+      "exp2-b3",
+      "ach-b1",
+      "ach-b2"
+    ],
+    "rephrasings": [],
+    "skills_to_show": [
+      "Python",
+      "C++",
+      "Java",
+      "JavaScript",
+      "TypeScript",
+      "Node.js",
+      "Express.js",
+      "Django",
+      "React",
+      "Next.js",
+      "PostgreSQL",
+      "MongoDB",
+      "Git",
+      "Docker",
+      "GitHub Actions",
+      "Postman"
+    ],
+    "summary": null,
+    "jd_keywords": [
+      "Python",
+      "AI",
+      "SAP"
+    ]
+  }
+]

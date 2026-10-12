@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings, get_settings
 from app.core.redis import get_redis
 from app.models import User
+from app.services.contacts.apollo import ApolloProvider
 from app.services.contacts.base import ContactProvider
 from app.services.contacts.fake import FakeContactProvider
 from app.services.contacts.hunter import HunterProvider
@@ -33,6 +34,10 @@ from app.services.llm.client import LLMClient
 from app.services.llm.fake import FakeLLMClient
 from app.services.llm.gemini import GeminiClient
 from app.services.llm.rate_limit import RateLimiter
+from app.services.prospects.base import CompanySearchProvider
+from app.services.prospects.fake import FakeCompanySearch
+from app.services.prospects.website import WebsiteFetcher, website_http
+from app.services.prospects.yc import YCDirectory
 from app.services.sources.http import PoliteHttpClient
 
 _FAKE_RESPONSES = Path(__file__).parent / "llm" / "fake_responses"
@@ -99,6 +104,39 @@ def _fake_email_draft(prompt: str) -> dict[str, Any]:
     }
 
 
+_COMPANY_REF_RE = re.compile(r'"company_ref": "([0-9a-f]{8})"')
+
+
+def _fake_company_scores(prompt: str) -> list[dict[str, Any]]:
+    """USE_FAKES answer for prompts/match_company.md: a stable pseudo-random score per company."""
+    refs = _COMPANY_REF_RE.findall(prompt.split("## Companies", 1)[-1])
+    return [
+        {
+            "company_ref": ref,
+            "fit_score": 45 + int(hashlib.sha256(ref.encode()).hexdigest(), 16) % 51,
+            "angle": "Your backend projects are close to what this company builds.",
+            "reasoning": "Sample score from the fake LLM (USE_FAKES=true).",
+        }
+        for ref in refs
+    ]
+
+
+def _fake_open_email(prompt: str) -> dict[str, Any]:
+    """USE_FAKES answer for prompts/draft_open_email.md: a short draft that never implies an opening."""
+    match = _INPUTS_BLOCK_RE.search(prompt)
+    inputs: dict[str, Any] = json.loads(match.group(1)) if match else {}
+    company = inputs.get("company") or "your company"
+    return {
+        "subject": f"Interns at {company}?"[:70],
+        "body": (
+            f"I've been building backend projects in Python and wanted to ask whether {company} ever "
+            "takes interns. If it's not something you do, a pointer to whoever handles hiring would "
+            "help. Resume's attached. (Sample draft from the fake LLM, USE_FAKES=true.)"
+        ),
+        "personalization_source": (inputs.get("context_sentences") or [company])[0],
+    }
+
+
 def build_fake_llm_client() -> FakeLLMClient:
     """For USE_FAKES=true local runs: canned answers so the UI works without an API key."""
     client = FakeLLMClient()
@@ -107,6 +145,9 @@ def build_fake_llm_client() -> FakeLLMClient:
     client.add_responder("match", _fake_match_scores)
     client.add_responder("tailor", _fake_tailor_plan)
     client.add_responder("draft_email", _fake_email_draft)
+    client.add_responder("match_company", _fake_company_scores)
+    client.add_responder("tailor_open", _fake_tailor_plan)
+    client.add_responder("draft_open_email", _fake_open_email)
     return client
 
 
@@ -147,6 +188,31 @@ def get_contact_provider_factory() -> Callable[[str], ContactProvider]:
     if get_settings().use_fakes:
         return lambda _key: _fake_contacts
     return HunterProvider
+
+
+def get_apollo_factory() -> Callable[[str], ContactProvider]:
+    """Apollo comes before Hunter for users who saved an Apollo key (PLAN.md Phase 8)."""
+    if get_settings().use_fakes:
+        return lambda _key: FakeContactProvider(name="apollo", can_verify=False, resolve_names=False)
+    return ApolloProvider
+
+
+@lru_cache
+def get_company_search() -> CompanySearchProvider:
+    """Companies for open outreach: the public YC directory (Apollo's organization search needs a
+    paid plan). USE_FAKES uses the recorded slice of it."""
+    if get_settings().use_fakes:
+        return FakeCompanySearch()
+    return YCDirectory(get_source_http())
+
+
+@lru_cache
+def get_website_fetcher() -> WebsiteFetcher | None:
+    """Reads a company's website on demand (open-outreach drafts with no company text yet). None with
+    fakes on: tests and fake runs never fetch real sites."""
+    if get_settings().use_fakes:
+        return None
+    return WebsiteFetcher(website_http())
 
 
 _fake_mailboxes: dict[str, FakeGmailClient] = {}

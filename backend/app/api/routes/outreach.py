@@ -15,12 +15,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.errors import api_error, llm_errors
 from app.core.auth import CurrentUser
 from app.core.db import get_session
-from app.models import Job, JobMatch, Outreach
-from app.models.enums import JobMatchStatus, Outcome, OutreachEventType, OutreachStatus
+from app.models import CompanyMatch, Job, JobMatch, Outreach
+from app.models.enums import (
+    CampaignType,
+    CompanyMatchStatus,
+    JobMatchStatus,
+    Outcome,
+    OutreachEventType,
+    OutreachStatus,
+)
 from app.schemas.outreach import (
     BuildQueued,
     DraftEditIn,
     ManualContactIn,
+    ModeStats,
     OutreachDetail,
     OutreachList,
     RegenerateIn,
@@ -30,14 +38,25 @@ from app.schemas.outreach import (
 )
 from app.services.contacts.service import ManualContactError, ProviderFactory, set_contact_manually
 from app.services.contacts.views import outreach_detail, outreach_list_item, outreach_timeline
-from app.services.email.drafter import MAX_EDIT_WORDS, DraftError, check_text, replace_greeting
+from app.services.email.drafter import (
+    MAX_EDIT_WORDS,
+    DraftError,
+    check_text,
+    opening_claims,
+    replace_greeting,
+)
 from app.services.email.pipeline import DraftingPausedError, DraftPipeline, pdf_for
 from app.services.email.state import InvalidTransitionError, record_event, transition
 from app.services.llm.client import LLMClient
 from app.services.llm.user_keys import resolve_api_key
 from app.services.matching.filters import hard_filter_conditions
 from app.services.matching.pipeline import load_preferences
-from app.services.registry import get_contact_provider_factory, get_llm_client
+from app.services.registry import (
+    get_apollo_factory,
+    get_contact_provider_factory,
+    get_llm_client,
+    get_website_fetcher,
+)
 from app.workers.queue import enqueue
 
 router = APIRouter(prefix="/outreach", tags=["outreach"])
@@ -64,6 +83,15 @@ async def _owned(session: AsyncSession, user_id: uuid.UUID, outreach_id: uuid.UU
     return outreach
 
 
+def _email_issues(outreach: Outreach, subject: str, body: str) -> list[str]:
+    """What blocks saving or approving an email: the length/opt-out/placeholder rules, and for open
+    outreach any claim that an opening exists (invariant 10)."""
+    issues = check_text(subject, body, max_words=MAX_EDIT_WORDS)
+    if outreach.campaign_type == CampaignType.OPEN:
+        issues += opening_claims(subject, body)
+    return [i.message for i in issues]
+
+
 def _in_review(outreach: Outreach) -> None:
     if outreach.status != OutreachStatus.PENDING_REVIEW:
         raise api_error(
@@ -80,6 +108,7 @@ async def list_outreach(
     session: Session,
     outreach_status: Annotated[list[OutreachStatus] | None, Query(alias="status")] = None,
     outcome: Annotated[list[Outcome] | None, Query()] = None,
+    campaign_type: Annotated[CampaignType | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> OutreachList:
@@ -90,6 +119,8 @@ async def list_outreach(
         conditions.append(Outreach.status.in_(outreach_status))
     if outcome:
         conditions.append(Outreach.outcome.in_(outcome))
+    if campaign_type is not None:
+        conditions.append(Outreach.campaign_type == campaign_type)
     order = (
         Outreach.created_at
         if outreach_status == [OutreachStatus.PENDING_REVIEW]
@@ -133,9 +164,27 @@ async def review_stats(user: CurrentUser, session: Session) -> ReviewStats:
             ),
         )
     )
+    new_company_matches = await session.scalar(
+        select(func.count())
+        .select_from(CompanyMatch)
+        .where(
+            CompanyMatch.user_id == user.id,
+            CompanyMatch.status.in_([CompanyMatchStatus.NEW, CompanyMatchStatus.QUEUED]),
+            CompanyMatch.score >= prefs.min_fit_score,
+        )
+    )
+    by_mode = {
+        mode: ModeStats(
+            sent=await count(Outreach.campaign_type == mode, Outreach.sent_at.is_not(None)),
+            replied=await count(Outreach.campaign_type == mode, Outreach.replied_at.is_not(None)),
+        )
+        for mode in CampaignType
+    }
     return ReviewStats(
         pending_review=await count(Outreach.status == OutreachStatus.PENDING_REVIEW),
         new_matches=int(new_matches or 0),
+        new_company_matches=int(new_company_matches or 0),
+        by_mode=by_mode,
         sent_this_week=await count(Outreach.sent_at >= week_start),
         daily_send_cap=prefs.daily_send_cap,
         replies=await count(Outreach.replied_at.is_not(None)),
@@ -167,11 +216,9 @@ async def edit_draft(
     subject = body.subject.strip() if body.subject is not None else outreach.subject or ""
     text = body.body.strip() if body.body is not None else outreach.body or ""
     if (subject, text) != (outreach.subject, outreach.body):
-        issues = check_text(subject, text, max_words=MAX_EDIT_WORDS)
+        issues = _email_issues(outreach, subject, text)
         if issues:
-            raise api_error(
-                status.HTTP_422_UNPROCESSABLE_CONTENT, "draft_invalid", " ".join(i.message for i in issues)
-            )
+            raise api_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "draft_invalid", " ".join(issues))
         await record_event(
             session,
             outreach,
@@ -203,7 +250,7 @@ async def regenerate(
     with llm_errors():
         api_key = await resolve_api_key(session, user.id)
         try:
-            subject, text, source = await DraftPipeline(llm, factory).regenerate(
+            subject, text, source = await _pipeline(llm, factory).regenerate(
                 session, outreach, hint=body.hint, api_key=api_key
             )
         except DraftError as exc:
@@ -233,11 +280,9 @@ async def approve(outreach_id: uuid.UUID, user: CurrentUser, session: Session) -
     send time)."""
     outreach = await _owned(session, user.id, outreach_id)
     _in_review(outreach)
-    problems = check_text(outreach.subject or "", outreach.body or "", max_words=MAX_EDIT_WORDS)
+    problems = _email_issues(outreach, outreach.subject or "", outreach.body or "")
     if problems:
-        raise api_error(
-            status.HTTP_422_UNPROCESSABLE_CONTENT, "draft_invalid", " ".join(i.message for i in problems)
-        )
+        raise api_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "draft_invalid", " ".join(problems))
     if outreach.contact_id is None:
         raise api_error(status.HTTP_409_CONFLICT, "no_contact", "Add a contact before approving.")
     ats = (outreach.tailored_resume or {}).get("ats") or {}
@@ -278,6 +323,10 @@ async def retry(
     return await outreach_detail(session, outreach)
 
 
+def _pipeline(llm: LLMClient, factory: ProviderFactory) -> DraftPipeline:
+    return DraftPipeline(llm, factory, apollo_factory=get_apollo_factory(), fetcher=get_website_fetcher())
+
+
 async def run_pipeline(
     session: AsyncSession, outreach: Outreach, user_id: uuid.UUID, llm: LLMClient, factory: ProviderFactory
 ) -> None:
@@ -286,7 +335,7 @@ async def run_pipeline(
     try:
         with llm_errors():
             try:
-                await DraftPipeline(llm, factory).run(session, outreach, actor_id=user_id)
+                await _pipeline(llm, factory).run(session, outreach, actor_id=user_id)
             except DraftingPausedError as exc:
                 raise exc.cause from exc
     finally:

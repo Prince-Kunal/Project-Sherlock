@@ -17,7 +17,14 @@ from app.models import Company, Contact, Job, Outreach, OutreachEvent, User
 from app.models.enums import CampaignType, JobSourceType, OutreachEventType, OutreachStatus
 from app.schemas.outreach import EmailDraft
 from app.schemas.resume import Basics
-from app.services.email.drafter import MAX_EDIT_WORDS, OPT_OUT_LINE, OPT_OUT_LINES, check_text, compose_body
+from app.services.email.drafter import (
+    MAX_EDIT_WORDS,
+    OPT_OUT_LINE,
+    OPT_OUT_LINES,
+    check_text,
+    compose_body,
+    opening_claims,
+)
 from app.services.email.fake_gmail import FakeGmailClient
 from app.services.email.scheduler import Scheduler
 from app.services.email.state import record_event, transition
@@ -155,6 +162,33 @@ def test_drafts_always_get_the_opt_out_line_and_edits_cannot_drop_it() -> None:
     assert check_text("Referral", body, max_words=MAX_EDIT_WORDS) == []
     issues = check_text("Referral", body.replace(line, ""), max_words=MAX_EDIT_WORDS)
     assert [i.code for i in issues] == ["no_opt_out"]
+
+
+# --- Invariant 10: open-outreach emails never claim or imply a specific opening ---
+
+
+def test_open_outreach_validator_rejects_a_claimed_opening() -> None:
+    claim = "I'd love to be considered for the backend intern role you posted. Resume attached."
+    assert [i.code for i in opening_claims("Backend interns at Corvid?", claim)] == ["implies_opening"]
+    assert opening_claims("Backend interns at Corvid?", "Does your team take interns? Resume attached.") == []
+
+
+async def test_open_outreach_edits_and_approval_cannot_claim_an_opening(
+    auth_client: AsyncClient, session: AsyncSession
+) -> None:
+    user_id = uuid.UUID((await auth_client.get("/auth/me")).json()["id"])
+    user = await session.get(User, user_id)
+    assert user is not None
+    outreach = await sendable(session, user, approve=False)  # an open-outreach draft in review
+    assert outreach.campaign_type == CampaignType.OPEN
+    claim = (outreach.body or "").replace(
+        "Does your team take", "Can you refer me for the role you posted for"
+    )
+    edited = await auth_client.patch(f"/outreach/{outreach.id}", json={"body": claim})
+    assert edited.status_code == 422
+    await session.execute(update(Outreach).where(Outreach.id == outreach.id).values(body=claim))
+    await session.commit()
+    assert (await auth_client.post(f"/outreach/{outreach.id}/approve")).status_code == 422
 
 
 # --- Invariant 11: no approval without an ATS-passing PDF; invariant 1: approval is recorded ---

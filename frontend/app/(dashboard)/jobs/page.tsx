@@ -3,6 +3,7 @@
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";
 
+import { PageHeader } from "@/components/page-header";
 import { AddJobUrl } from "@/components/jobs/add-job-url";
 import { AllJobs } from "@/components/jobs/all-jobs";
 import { MatchesList } from "@/components/jobs/matches-list";
@@ -17,29 +18,27 @@ export default function JobsPage() {
   const [tab, setTab] = useState("matches");
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Jobs</h1>
-          <p className="text-muted-foreground text-sm">
-            Fresh openings scored against your resume and preferences.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {me.data?.is_admin && (
-            <Button
-              variant="ghost"
-              disabled={poll.isPending || poll.isSuccess}
-              onClick={() => poll.mutate()}
-              title="Ask the worker to poll every source now"
-            >
-              <RefreshCw />{" "}
-              {poll.isSuccess ? "Poll queued" : "Poll sources now"}
-            </Button>
-          )}
-          <AddJobUrl />
-        </div>
-      </div>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Jobs"
+        description="Fresh openings, scored against your resume and preferences."
+        actions={
+          <>
+            {me.data?.is_admin && (
+              <Button
+                variant="ghost"
+                disabled={poll.isPending || poll.isSuccess}
+                onClick={() => poll.mutate()}
+                title="Ask the worker to poll every source now"
+              >
+                <RefreshCw />{" "}
+                {poll.isSuccess ? "Poll queued" : "Poll sources now"}
+              </Button>
+            )}
+            <AddJobUrl />
+          </>
+        }
+      />
 
       <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
         <TabsList>

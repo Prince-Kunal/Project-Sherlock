@@ -1,6 +1,7 @@
 .env
 .DS_Store
 **/data/files/
+.claude
 
 # Python
 __pycache__/

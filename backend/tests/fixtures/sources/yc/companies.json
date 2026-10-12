@@ -1,0 +1,384 @@
+[
+  {
+    "name": "100x",
+    "slug": "100x",
+    "website": "https://100x.bot?utm_source=inbound&utm_medium=bookface&utm_campaign=yc&utm_id=122",
+    "one_liner": "Create, Share, and Monetize AI Agents",
+    "long_description": "",
+    "team_size": 3,
+    "industry": "B2B",
+    "subindustry": "B2B -> Productivity",
+    "industries": [
+      "B2B",
+      "Productivity"
+    ],
+    "tags": [
+      "Artificial Intelligence",
+      "AI",
+      "AI Assistant"
+    ],
+    "regions": [
+      "India",
+      "South Asia"
+    ],
+    "all_locations": "Bengaluru, KA, India",
+    "status": "Active",
+    "stage": "Early",
+    "isHiring": false,
+    "nonprofit": false
+  },
+  {
+    "name": "AlgoSurg Inc",
+    "slug": "algosurg-inc",
+    "website": "http://www.algosurg.com",
+    "one_liner": "We make AI technology for Robotic and AR Surgeries",
+    "long_description": "AlgoSurg makes AI software solutions, for various next-generation surgical applications ranging from Robotics-surgeries, AR-based-navigation/training, cloud-based 3D surgery planning and automatic patient-specific instrument/implant design.\r\n",
+    "team_size": 8,
+    "industry": "Healthcare",
+    "subindustry": "Healthcare -> Healthcare Services",
+    "industries": [
+      "Healthcare",
+      "Healthcare Services"
+    ],
+    "tags": [
+      "Augmented Reality",
+      "Robotic Surgery",
+      "Medical Devices"
+    ],
+    "regions": [
+      "India",
+      "South Asia",
+      "Remote",
+      "Fully Remote"
+    ],
+    "all_locations": "MH, India; Remote",
+    "status": "Active",
+    "stage": "Early",
+    "isHiring": false,
+    "nonprofit": false
+  },
+  {
+    "name": "AlgoTest",
+    "slug": "algotest",
+    "website": "https://algotest.in",
+    "one_liner": "Ecosystem for options trading in India",
+    "long_description": "AlgoTest is an algorithmic options trading platform for Indian retail traders. For the first time ever, day traders will be able to trade using the same technology as the top hedge funds and high-frequency trading firms of the world.\r\n\r\nThe company is founded by Raghav Malik (Financial Engineering @ Columbia Univ), an HFT technologist and former options market-maker in the US.",
+    "team_size": 40,
+    "industry": "Fintech",
+    "subindustry": "Fintech",
+    "industries": [
+      "Fintech"
+    ],
+    "tags": [
+      "Fintech",
+      "No-code"
+    ],
+    "regions": [
+      "India",
+      "South Asia"
+    ],
+    "all_locations": "Delhi, DL, India",
+    "status": "Active",
+    "stage": "Early",
+    "isHiring": true,
+    "nonprofit": false
+  },
+  {
+    "name": "AlgoUniversity",
+    "slug": "algouniversity",
+    "website": "http://algouniversity.com/",
+    "one_liner": "Building Job driven Virtual Tech University for India 🇮🇳",
+    "long_description": "We are building live teaching infrastructure that enables handful of top educators (from Google, Facebook, etc) to coach a large number of students.\r\nWe train college students in a year-long live cohorts and they pay us a portion of their salary as fees once they get a tech job (Income Sharing Agreement)",
+    "team_size": 40,
+    "industry": "Education",
+    "subindustry": "Education",
+    "industries": [
+      "Education"
+    ],
+    "tags": [
+      "Education",
+      "Income Share Agreements",
+      "eLearning"
+    ],
+    "regions": [
+      "India",
+      "South Asia",
+      "Remote",
+      "Partly Remote"
+    ],
+    "all_locations": "Hyderabad, Telangana, India",
+    "status": "Active",
+    "stage": "Early",
+    "isHiring": true,
+    "nonprofit": false
+  },
+  {
+    "name": "AccioJob",
+    "slug": "acciojob",
+    "website": "https://acciojob.com",
+    "one_liner": "Offline-first tech skilling and placement for India",
+    "long_description": "AccioJob is an offline-first tech skilling and placement institute. We run\r\nphysical skill centres in Noida, Pune, Hyderabad and Chennai alongside an\r\nonline programme, training graduates in Data Analytics, Data Science & AI and AI Engineering with Full Stack. 2,000+ students placed across 500+ hiring\r\npartners, with 50+ hiring drives run every month.",
+    "team_size": 120,
+    "industry": "Education",
+    "subindustry": "Education",
+    "industries": [
+      "Education"
+    ],
+    "tags": [
+      "Education",
+      "Recruiting",
+      "Edtech"
+    ],
+    "regions": [
+      "India",
+      "South Asia"
+    ],
+    "all_locations": "Gurugram, HR, India",
+    "status": "Active",
+    "stage": "Growth",
+    "isHiring": false,
+    "nonprofit": false
+  },
+  {
+    "name": "Advantage Club",
+    "slug": "advantage-club",
+    "website": "https://www.advantageclub.co",
+    "one_liner": "Global platform for employee engagement with rewards&flexible benefits",
+    "long_description": "Advantage Club is a global platform for employee engagement including rewards, flexible benefits, perks and communities. We are currently live with 1000+ companies across 100+ countries and have a ARR of ~$8m. Our revenue has grown ~4x in the last 1 year.",
+    "team_size": 220,
+    "industry": "B2B",
+    "subindustry": "B2B -> Human Resources",
+    "industries": [
+      "B2B",
+      "Human Resources"
+    ],
+    "tags": [
+      "SaaS",
+      "Human Resources",
+      "B2B",
+      "HR Tech"
+    ],
+    "regions": [
+      "India",
+      "United States of America",
+      "Philippines",
+      "United Arab Emirates",
+      "Singapore",
+      "South Asia",
+      "America / Canada",
+      "Southeast Asia",
+      "Middle East and North Africa",
+      "Remote",
+      "Partly Remote"
+    ],
+    "all_locations": "Gurugram, HR, India; San Francisco, CA, USA; Bengaluru, KA, India; Chicago, IL, USA; Mumbai, MH, India; Manila, NCR, Philippines; Dubai, Dubai, United Arab Emirates; Singapore, Singapore",
+    "status": "Active",
+    "stage": "Early",
+    "isHiring": false,
+    "nonprofit": false
+  },
+  {
+    "name": "10 By 10",
+    "slug": "10-by-10",
+    "website": "https://10by10.io",
+    "one_liner": "10by10 is a unique marketplace in the recruiting agency industry for…",
+    "long_description": "10by10 is a marketplace to instantly match qualified candidates with companies by pooling candidates across recruitment agencies. Check out the testimonials on our website (www.10by10.io).",
+    "team_size": 5,
+    "industry": "B2B",
+    "subindustry": "B2B -> Recruiting and Talent",
+    "industries": [
+      "B2B",
+      "Recruiting and Talent"
+    ],
+    "tags": [
+      "Artificial Intelligence",
+      "Marketplace",
+      "Recruiting"
+    ],
+    "regions": [
+      "United States of America",
+      "America / Canada",
+      "Remote",
+      "Fully Remote"
+    ],
+    "all_locations": "San Francisco, CA, USA; Remote",
+    "status": "Active",
+    "stage": "Early",
+    "isHiring": false,
+    "nonprofit": false
+  },
+  {
+    "name": "9gag",
+    "slug": "9gag",
+    "website": "http://9gag.com",
+    "one_liner": "Make the world happier.",
+    "long_description": "9GAG  is the global cross-platform entertainment media network. It is a place for fun, conversation, and engagement. Founded in 2008, 9GAG’s mission is to make the world happier. \r\n\r\n9GAG has a total of 150 million global audience with 39 million followers on Facebook, 44 million on Instagram and 15 million on Twitter. Being #1 ranked global social media platform in entertainment & gaming, #1 ranked US's cross-platform video creators, we distribute 2.2 billion social video views on a monthly basis (source: tubular labs). 9GAG.com is #6 most followed  brand on Instagram and is a top 200 website globally.\r\n\r\n9GAG is backed by: Freestyle Capital, True Ventures, First Round Capital, Greycroft Partners, 500 Startups, Y Combinator and a group of great angel investors in the United States. eg Anthony Soohoo, Benjamin Ling, BoxGroup, Gary Vaynerchuk, James Hong, Kevin Rose, Karl Jacob, Lowercase Capital, Maneesh Arora, Naval Ravikant, Othman Laraki, Philip Kaplan, Rich Chen, Rich Lefurgy, Scott and Cyan Banister, Tim Ferriss.",
+    "team_size": 36,
+    "industry": "Consumer",
+    "subindustry": "Consumer -> Social",
+    "industries": [
+      "Consumer",
+      "Social"
+    ],
+    "tags": [
+      "Social Media",
+      "Social",
+      "Social Network"
+    ],
+    "regions": [
+      "Hong Kong",
+      "East Asia",
+      "Remote",
+      "Fully Remote"
+    ],
+    "all_locations": "Hong Kong, Hong Kong; Remote",
+    "status": "Active",
+    "stage": "Growth",
+    "isHiring": false,
+    "nonprofit": false
+  },
+  {
+    "name": "Abstra",
+    "slug": "abstra",
+    "website": "https://abstra.io",
+    "one_liner": "Automate finance operations with Python and AI",
+    "long_description": "Abstra is a platform that allows finance teams to build, run, and automate their workflows using Python and AI.\r\n\r\nInstead of relying on spreadsheets, ERPs, and manual processes, teams can create programmable workflows for tasks like reporting, reconciliations, approvals, and integrations with systems like SAP.\r\n\r\nWe provide a developer-friendly environment where finance and technical teams can turn business processes into code, connect to their existing tools, and run everything in a controlled, auditable way.\r\n\r\nOur goal is to become the operating system for finance operations, where workflows are not static or manual, but versioned, automated, and continuously improved.",
+    "team_size": 18,
+    "industry": "B2B",
+    "subindustry": "B2B -> Engineering, Product and Design",
+    "industries": [
+      "B2B",
+      "Engineering, Product and Design"
+    ],
+    "tags": [
+      "Artificial Intelligence",
+      "SaaS",
+      "Finance",
+      "B2B",
+      "Automation"
+    ],
+    "regions": [
+      "Brazil",
+      "Latin America",
+      "Remote",
+      "Fully Remote"
+    ],
+    "all_locations": "São Paulo, SP, Brazil; Remote",
+    "status": "Active",
+    "stage": "Early",
+    "isHiring": false,
+    "nonprofit": false
+  },
+  {
+    "name": "10x",
+    "slug": "10x",
+    "website": "https://www.10xdental.com/",
+    "one_liner": "AI Sales Teams for Dental Practices",
+    "long_description": "10x helps dental practices turn missed revenue opportunities into booked appointments. We connect to a practice’s patient database, identify overdue recalls, lapsed patients, and unscheduled treatment plans, then use AI calling and texting to bring those patients back into the chair.",
+    "team_size": 3,
+    "industry": "Healthcare",
+    "subindustry": "Healthcare",
+    "industries": [
+      "Healthcare"
+    ],
+    "tags": [],
+    "regions": [
+      "United States of America",
+      "America / Canada"
+    ],
+    "all_locations": "San Francisco, CA, USA",
+    "status": "Active",
+    "stage": "Early",
+    "isHiring": true,
+    "nonprofit": false
+  },
+  {
+    "name": "1849 bio",
+    "slug": "1849-bio",
+    "website": "https://www.1849.bio",
+    "one_liner": "Engineering microbes for miners to unlock billions in trapped metal",
+    "long_description": "1849 bio designs microbes enabling cheap metal extraction allowing miners to unlock value from low quality copper and gold ores. Surprisingly, the mining industry is one of the largest scale users of biotech in the world with biomining processes accounting for ~1% of global copper production. Biomining is ultra-low cost, running around ~$1/ton of ore vs ~$7/ton for conventional processes. \r\n\r\nUnfortunately, while biomining is cheap, it can’t be applied to over 80% of copper ores, leaving vast resources without profitable extraction methods. An estimated ~$800B of copper sit today in waste materials and stockpiles with negative unit economics.\r\n\r\nWhile a great deal of effort has been spent on optimizing microbial metal extraction processes, very little effort has been spent on optimizing the microbes themselves. \r\n\r\nTo change that, we’re creating new biotech tools and platforms applied directly to the types of biology most relevant to miners. This enables us to develop new microbes and tackle some of the most difficult problems in biomining, unlocking billions in value from unprofitable resources while being more environmentally friendly than conventional processes.\r\n\r\nWe’re world class microbial engineers. We met while doing our PhDs in synthetic biology, where we spent our time applying and developing the most advanced bioengineering technologies to engineer living cells. ",
+    "team_size": 3,
+    "industry": "Industrials",
+    "subindustry": "Industrials",
+    "industries": [
+      "Industrials"
+    ],
+    "tags": [
+      "Hard Tech",
+      "Synthetic Biology",
+      "Biotech",
+      "Climate",
+      "Mining"
+    ],
+    "regions": [
+      "United States of America",
+      "America / Canada"
+    ],
+    "all_locations": "San Francisco, CA, USA",
+    "status": "Active",
+    "stage": "Early",
+    "isHiring": false,
+    "nonprofit": false
+  },
+  {
+    "name": "Aerotime",
+    "slug": "aerotime",
+    "website": "https://www.aerotime.com",
+    "one_liner": "Calendar that kills time fragmentation",
+    "long_description": "A modern calendar that helps people prioritize their work by goal setting, time blocking, and reducing fragmentation created by randomly placed meetings and distracting Slack messages.\r\n\r\nAerotime helps you create key goals for the week, helps break it down into tasks and meetings, and streamlines the calendar to support and align your team. This leads to people being effective and not busy.",
+    "team_size": 6,
+    "industry": "B2B",
+    "subindustry": "B2B -> Productivity",
+    "industries": [
+      "B2B",
+      "Productivity"
+    ],
+    "tags": [
+      "SaaS",
+      "Productivity"
+    ],
+    "regions": [
+      "United States of America",
+      "India",
+      "America / Canada",
+      "South Asia",
+      "Remote",
+      "Partly Remote"
+    ],
+    "all_locations": "San Francisco, CA, USA; Bengaluru, KA, India",
+    "status": "Inactive",
+    "stage": "Early",
+    "isHiring": false,
+    "nonprofit": false
+  },
+  {
+    "name": "Contour",
+    "slug": "contour",
+    "website": "",
+    "one_liner": "AI voice agents for healthcare operational calls",
+    "long_description": "Contour is the enterprise voice AI platform for healthcare logistics. Provider networks, telemedicine companies, labs, and multi-site clinics use Contour to automate high volume, repetitive phone workflows that traditionally require dedicated back office staff. Built for regulated environments, Contour integrates directly with core clinical systems to handle every call with full auditability and HIPAA compliance.",
+    "team_size": 2,
+    "industry": "B2B",
+    "subindustry": "B2B",
+    "industries": [
+      "B2B"
+    ],
+    "tags": [
+      "Artificial Intelligence",
+      "B2B",
+      "Workflow Automation",
+      "Healthcare",
+      "Enterprise Software"
+    ],
+    "regions": [
+      "United States of America",
+      "America / Canada"
+    ],
+    "all_locations": "New York City, NY, USA",
+    "status": "Active",
+    "stage": "Early",
+    "isHiring": false,
+    "nonprofit": false
+  }
+]

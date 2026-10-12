@@ -26,7 +26,12 @@ from app.services.email.scheduler import Scheduler
 from app.services.jobs.poll import PollSources, hn_keywords, run_poll
 from app.services.matching.embed import embed_missing_jobs
 from app.services.matching.pipeline import Matcher, expire_matches
+from app.services.prospects.discovery import Discovery
+from app.services.prospects.matching import CompanyMatcher
+from app.services.prospects.website import WebsiteFetcher, website_http
 from app.services.registry import (
+    get_apollo_factory,
+    get_company_search,
     get_contact_provider_factory,
     get_embedder,
     get_gmail_factory,
@@ -110,10 +115,48 @@ async def build_daily_drafts(ctx: dict[str, Any], user_id: str | None = None) ->
             user_ids = await users_due_for_drafts(session, get_redis(), datetime.now(UTC))
     if not user_ids:
         return {"users": 0, "drafted": 0, "failed": 0, "stopped": 0}
-    pipeline = DraftPipeline(get_llm_client(), get_contact_provider_factory())
+    pipeline = DraftPipeline(
+        get_llm_client(),
+        get_contact_provider_factory(),
+        apollo_factory=get_apollo_factory(),
+        fetcher=WebsiteFetcher(ctx["website_http"]),
+    )
     run = await pipeline.build_all(sessions, user_ids)
     log.info("build_daily_drafts: %s stopped=%s", run.as_dict(), run.stopped)
     return run.as_dict()
+
+
+async def discover_prospect_companies(ctx: dict[str, Any], user_id: str | None = None) -> dict[str, int]:
+    """Daily (PLAN.md §8): companies for every active prospect target (or just `user_id`'s, from the
+    "Find companies" button), their website text, and embeddings; then company matching."""
+    discovery = Discovery(get_company_search(), WebsiteFetcher(ctx["website_http"]), get_embedder())
+    async with get_sessionmaker()() as session:
+        summary = await discovery.run(
+            session, datetime.now(UTC), uuid.UUID(user_id) if user_id is not None else None
+        )
+    log.info("discover_prospect_companies: %s", summary.as_dict())
+    if summary.targets:
+        await ctx["redis"].enqueue_job(
+            "match_companies_for_users", user_id, _job_id=f"match_companies:{user_id or 'all'}"
+        )
+    return summary.as_dict()
+
+
+async def match_companies_for_users(ctx: dict[str, Any], user_id: str | None = None) -> dict[str, int]:
+    """After discovery (PLAN.md §8): score new (user, company) pairs into company_matches."""
+    settings = get_settings()
+    matcher = CompanyMatcher(
+        llm=get_llm_client(), embedder=get_embedder(), redis=get_redis(), settings=settings
+    )
+    sessions = get_sessionmaker()
+    if user_id is None:
+        run = await matcher.match_all(sessions)
+        log.info("match_companies_for_users: %s stopped=%s", run.as_dict(), run.stopped)
+        return run.as_dict()
+    async with sessions() as session:
+        summary = await matcher.match_user(session, uuid.UUID(user_id))
+    log.info("match_companies_for_users: user=%s %s", user_id, summary)
+    return {"users": 1, "scored": summary.scored, "llm_calls": summary.llm_calls}
 
 
 async def _users_with(statuses: list[OutreachStatus], need_thread: bool = False) -> list[User]:
@@ -182,7 +225,7 @@ async def create_followups(ctx: dict[str, Any], user_id: str | None = None) -> d
             user_ids = await users_due_for_drafts(
                 session, get_redis(), datetime.now(UTC), hour=FOLLOWUP_HOUR, job="followups_built"
             )
-    totals = {"users": 0, "drafted": 0, "failed": 0}
+    totals = {"users": 0, "drafted": 0, "failed": 0, "upgraded": 0}
     followups = Followups(get_llm_client())
     for uid in user_ids:
         async with sessions() as session:
@@ -194,6 +237,7 @@ async def create_followups(ctx: dict[str, Any], user_id: str | None = None) -> d
         totals["users"] += 1
         totals["drafted"] += summary.drafted
         totals["failed"] += summary.failed
+        totals["upgraded"] += summary.upgraded
     log.info("create_followups: %s", totals)
     return totals
 
@@ -201,11 +245,13 @@ async def create_followups(ctx: dict[str, Any], user_id: str | None = None) -> d
 async def startup(ctx: dict[str, Any]) -> None:
     configure_logging()
     ctx["http"] = PoliteHttpClient()
+    ctx["website_http"] = website_http()
     log.info("worker started")
 
 
 async def shutdown(ctx: dict[str, Any]) -> None:
     await ctx["http"].aclose()
+    await ctx["website_http"].aclose()
 
 
 class WorkerSettings:
@@ -219,6 +265,8 @@ class WorkerSettings:
         schedule_and_send,
         check_replies,
         create_followups,
+        func(discover_prospect_companies, keep_result=60, timeout=3600),
+        func(match_companies_for_users, keep_result=60),
     ]
     cron_jobs: ClassVar[list[CronJob]] = [
         # Every 6h, off the top of the hour. Not at startup: restarts shouldn't hammer job boards.
@@ -229,6 +277,8 @@ class WorkerSettings:
         cron(schedule_and_send, minute=set(range(0, 60, 5)), timeout=600, unique=True),
         cron(check_replies, minute={11, 41}, timeout=900, unique=True),
         cron(create_followups, minute={4}, timeout=1800, unique=True),
+        # Daily, before the morning drafts in India (23:37 UTC is 05:07 IST); matching follows it.
+        cron(discover_prospect_companies, hour={23}, minute=37, timeout=3600, unique=True),
     ]
     on_startup = startup
     on_shutdown = shutdown

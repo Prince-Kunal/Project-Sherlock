@@ -3,6 +3,8 @@
 - Startups (size_hint == startup or ≤ 50 people): founder/CTO → engineering manager → recruiter.
 - Everyone else: engineering manager or team lead in a relevant department → recruiter → senior engineer.
 - Never: suppressed addresses, invalid addresses, or anyone contacted by any user in the last 30 days.
+- Open outreach (Phase 8): people holding one of the target's `contact_titles` come before everyone
+  else, even in roles the rules above would skip (the user asked for that title).
 """
 
 import re
@@ -93,11 +95,25 @@ _VERIFICATION_ORDER = {
 }
 
 
-def rank_contacts(contacts: list[Contact], *, startup: bool, eligibility: Eligibility) -> list[Contact]:
-    """Eligible contacts in the order to try them; people outside the rules' roles are left out."""
+def _words(text: str) -> set[str]:
+    return set(re.findall(r"[a-z0-9]+", text.lower()))
+
+
+def has_title(contact: Contact, titles: list[str]) -> bool:
+    """The contact's title contains every word of one of `titles` ("CTO" matches "Co-founder & CTO",
+    "Engineering Manager" matches "Senior Engineering Manager, Payments")."""
+    have = _words(contact.title or "")
+    return any((want := _words(t)) and want <= have for t in titles)
+
+
+def rank_contacts(
+    contacts: list[Contact], *, startup: bool, eligibility: Eligibility, titles: list[str] | None = None
+) -> list[Contact]:
+    """Eligible contacts in the order to try them; people outside the rules' roles are left out
+    unless they hold one of `titles`."""
     ranked = []
     for contact in contacts:
-        tier = _tier(contact, startup)
+        tier = -1 if titles and has_title(contact, titles) else _tier(contact, startup)
         if tier is None or not eligibility.allows(contact):
             continue
         ranked.append(

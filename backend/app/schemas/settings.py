@@ -27,6 +27,12 @@ class HunterKeyStatus(BaseModel):
     monthly_limit: int
 
 
+class ApolloKeyStatus(BaseModel):
+    configured: bool
+    verified_at: datetime | None
+    searches_this_month: int  # Apollo people searches (free) plus Hunter's count toward the monthly limit
+
+
 class GmailStatus(BaseModel):
     connected: bool  # authorised, with both Gmail permissions, and not expired
     email: str

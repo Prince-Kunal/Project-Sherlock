@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import { PageHeader } from "@/components/page-header";
 import { PreferencesForm } from "@/components/profile/preferences-form";
 import { PreviewPanel } from "@/components/profile/preview-panel";
 import { ResumeEditor } from "@/components/profile/resume-editor";
@@ -24,9 +25,10 @@ export default function ProfilePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold tracking-tight">
-        Profile and resume
-      </h1>
+      <PageHeader
+        title="Profile and resume"
+        description="Your master resume is the only source Sherlock draws from. Nothing else ever appears on a tailored copy."
+      />
 
       {keyMissing && (
         <Alert variant="destructive">

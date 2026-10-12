@@ -295,7 +295,7 @@ async def test_monthly_lookup_allowance(session: AsyncSession) -> None:
 )
 async def test_provider_errors_become_reasons(session: AsyncSession, error: Exception, reason: str) -> None:
     class Failing(FakeContactProvider):
-        async def search_people(self, *, domain: str | None = None, company: str | None = None) -> object:  # type: ignore[override]
+        async def search_people(self, **_: object) -> object:  # type: ignore[override]
             raise error
 
     company = await _company(session)

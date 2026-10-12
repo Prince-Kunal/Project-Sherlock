@@ -1,6 +1,7 @@
 """Contact provider interface (PLAN.md Phase 5): people search, email finding and verification.
 
-Hunter is the implementation (hunter.py); Apollo can be added behind the same interface (Phase 8).
+Hunter (hunter.py) searches and verifies; Apollo (apollo.py, Phase 8) only searches. The finder runs
+them as a waterfall: contacts already in the database → Apollo (when the user has a key) → Hunter.
 """
 
 from abc import ABC, abstractmethod
@@ -53,11 +54,16 @@ class ContactQuotaError(ContactProviderError):
 
 class ContactProvider(ABC):
     name: str
+    can_verify: bool = True  # False: `verify` isn't available (another provider verifies)
 
     @abstractmethod
-    async def search_people(self, *, domain: str | None = None, company: str | None = None) -> PeopleSearch:
+    async def search_people(
+        self, *, domain: str | None = None, company: str | None = None, titles: list[str] | None = None
+    ) -> PeopleSearch:
         """Decision-makers at a company (founders, engineering leads, recruiters), by domain or, when
-        the domain is unknown, by company name. Costs one search credit."""
+        the domain is unknown, by company name. `titles` narrows the search where the provider
+        supports it (Apollo does; Hunter filters by seniority and department instead). Costs one
+        search credit."""
 
     @abstractmethod
     async def find_email(self, domain: str, first_name: str, last_name: str) -> EmailResult:

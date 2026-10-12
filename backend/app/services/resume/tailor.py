@@ -1,4 +1,5 @@
-"""Resume tailoring for one job (PLAN.md Phase 4).
+"""Resume tailoring for one job (PLAN.md Phase 4), or for one company with no job posted (Phase 8:
+open outreach, `prompts/tailor_open.md` with a synthetic brief in place of the job description).
 
 plan (LLM, smart model) → validate (deterministic; one retry with the issues) → apply → JD spelling →
 render to one page → ATS check (invariant 11) → diff. Any failure raises `TailorError` with a reason
@@ -7,14 +8,14 @@ the caller stores as the draft's `failure_reason`.
 
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from app.models import Company, Job
 from app.schemas.resume import Bullet, MasterResume
 from app.schemas.tailor import ResumeChange, SectionKey, TailorIssue, TailorPlan
 from app.services.llm.client import LLMClient
-from app.services.llm.prompt_loader import load_prompt
+from app.services.llm.prompt_loader import Prompt, load_prompt
 from app.services.llm.redaction import redact_pii
 from app.services.resume.assemble import (
     PageOverflowError,
@@ -102,6 +103,29 @@ def job_for_prompt(job: Job, company: Company) -> dict[str, Any]:
     }
 
 
+@dataclass
+class OpenBrief:
+    """What stands in for the job description in open outreach: the roles the user wants, what the
+    company does in its own words, and the angle from company matching."""
+
+    company: str
+    target_roles: list[str] = field(default_factory=list)
+    about: str = ""  # company description + website text
+    angle: str = ""
+
+    def payload(self) -> dict[str, Any]:
+        return {
+            "target_roles": self.target_roles,
+            "company": self.company,
+            "about": redact_pii(self.about[:JD_CHARS]),
+            "angle": self.angle,
+        }
+
+    def text(self) -> str:
+        """Scanned for keywords (JD spelling, coverage) the way a job description is."""
+        return "\n".join(p for p in (" / ".join(self.target_roles), self.about, self.angle) if p)
+
+
 def _feedback(issues: list[TailorIssue], previous: TailorPlan) -> str:
     lines = [f"- [{i.code}] {i.bullet_id + ': ' if i.bullet_id else ''}{i.message}" for i in issues]
     return "\n".join(lines) + "\n\nYour previous plan:\n```json\n" + previous.model_dump_json() + "\n```"
@@ -112,17 +136,25 @@ class Tailor:
         self._llm = llm
         self._lexicon = lexicon or get_lexicon()
         self._prompt = load_prompt("tailor")
+        self._open_prompt = load_prompt("tailor_open")
 
     async def plan(self, master: MasterResume, job: Job, company: Company, api_key: str | None) -> TailorPlan:
         """A plan that passes the validator, with one retry carrying the issues found."""
-        variables = {
-            "job": json.dumps(job_for_prompt(job, company), ensure_ascii=False),
-            "resume": json.dumps(resume_for_prompt(master), ensure_ascii=False),
-        }
+        job_json = json.dumps(job_for_prompt(job, company), ensure_ascii=False)
+        return await self._plan(self._prompt, {"job": job_json}, master, api_key)
+
+    async def plan_open(self, master: MasterResume, brief: OpenBrief, api_key: str | None) -> TailorPlan:
+        brief_json = json.dumps(brief.payload(), ensure_ascii=False)
+        return await self._plan(self._open_prompt, {"brief": brief_json}, master, api_key)
+
+    async def _plan(
+        self, prompt: Prompt, variables: dict[str, str], master: MasterResume, api_key: str | None
+    ) -> TailorPlan:
+        variables = {**variables, "resume": json.dumps(resume_for_prompt(master), ensure_ascii=False)}
         feedback = "(none)"
         issues: list[TailorIssue] = []
         for attempt in (1, 2):
-            request = self._prompt.request(
+            request = prompt.request(
                 tier="smart", api_key=api_key, allow_fallback=True, feedback=feedback, **variables
             )
             plan = await self._llm.generate(request, TailorPlan)
@@ -138,6 +170,10 @@ class Tailor:
     ) -> TailorResult:
         plan = await self.plan(master, job, company, api_key)
         return await self.build(master, plan, job.description_text)
+
+    async def tailor_open(self, master: MasterResume, brief: OpenBrief, api_key: str | None) -> TailorResult:
+        plan = await self.plan_open(master, brief, api_key)
+        return await self.build(master, plan, brief.text())
 
     async def build(self, master: MasterResume, plan: TailorPlan, jd_text: str) -> TailorResult:
         """Everything after the LLM: deterministic, so it's tested directly with hand-written plans."""

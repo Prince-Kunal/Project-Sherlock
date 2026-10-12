@@ -36,6 +36,13 @@ async def save_service_key(
     return row
 
 
+async def resolve_apollo_key(session: AsyncSession, user_id: uuid.UUID) -> str | None:
+    """The user's own Apollo key, if they saved one (PLAN.md Phase 8). There's no owner fallback:
+    Apollo's free plan needs an account registered with a work email, so it's opt-in per user."""
+    row = await get_service_key_row(session, user_id, ServiceKeyType.APOLLO)
+    return decrypt_secret(row.encrypted_api_key) if row is not None else None
+
+
 async def resolve_hunter_key(session: AsyncSession, user_id: uuid.UUID) -> str | None:
     """The user's Hunter key; else the owner's when the fallback is allowed; else None (then only
     contacts already in the database can be used)."""

@@ -1,10 +1,15 @@
-"""The draft pipeline (PLAN.md Phase 6): contact (Phase 5) → tailor (Phase 4) → draft → pending_review.
+"""The draft pipeline (PLAN.md Phase 6): contact (Phase 5) → tailor (Phase 4) → draft → pending_review. Open
+outreach (Phase 8) runs the same steps from a company match instead of a job: contact titles from the
+prospect target, a resume tailored to a synthetic brief, and an email hooked on the company's own text
+that never implies an opening.
 
-Shared by the daily `build_daily_drafts` task, the "Draft now" button on a match and "Retry" on a
-failed outreach. A step that fails for this job moves the outreach to `failed` with a reason and the
-batch goes on with the next job. When the user's LLM quota or key is the problem, nothing is failed:
-the outreach stays in `drafting` and `DraftingPausedError` stops the run, so the next run resumes it
-(the Hunter credit already spent on its contact isn't wasted).
+Shared by the daily `build_daily_drafts` task, the "Draft now" buttons on job and company matches and
+"Retry" on a failed outreach. The daily batch is split between job matches and company matches by
+`open_outreach_share`; when one side runs short, the other fills the gap (§8). A step that fails moves
+that outreach to `failed` with a reason and the batch goes on with the next one. When the user's LLM
+quota or key is the problem, nothing is failed: the outreach stays in `drafting` and
+`DraftingPausedError` stops the run, so the next run resumes it (the Hunter credit already spent on its
+contact isn't wasted).
 """
 
 import logging
@@ -21,8 +26,24 @@ from redis.asyncio import Redis
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.models import Company, Contact, Job, JobMatch, Outreach, User
-from app.models.enums import INACTIVE_OUTREACH_STATUSES, JobMatchStatus, OutreachStatus
+from app.models import (
+    Company,
+    CompanyMatch,
+    Contact,
+    Job,
+    JobMatch,
+    Outreach,
+    ProspectTarget,
+    User,
+    UserCompanyBlock,
+)
+from app.models.enums import (
+    INACTIVE_OUTREACH_STATUSES,
+    CampaignType,
+    CompanyMatchStatus,
+    JobMatchStatus,
+    OutreachStatus,
+)
 from app.schemas.resume import MasterResume
 from app.services.contacts.service import (
     OutreachConflictError,
@@ -30,8 +51,9 @@ from app.services.contacts.service import (
     build_finder,
     find_contact_for,
     start_job_outreach,
+    start_open_outreach,
 )
-from app.services.email.drafter import Drafter, DraftError, DraftInputs
+from app.services.email.drafter import Drafter, DraftError, DraftInputs, OpenDraftInputs
 from app.services.email.state import transition
 from app.services.llm.client import (
     LLMAuthError,
@@ -45,10 +67,11 @@ from app.services.llm.client import (
 from app.services.llm.user_keys import LLMKeyRequiredError, resolve_api_key
 from app.services.matching.filters import hard_filter_conditions
 from app.services.matching.pipeline import load_preferences
+from app.services.prospects.website import WebsiteFetcher
 from app.services.resume import store
 from app.services.resume.files import find_pdf, save_tailored_pdf
 from app.services.resume.skills import get_lexicon
-from app.services.resume.tailor import Tailor, TailorError, TailorResult
+from app.services.resume.tailor import OpenBrief, Tailor, TailorError, TailorResult
 from app.services.resume.validator import master_skill_set
 from app.services.usage import record_llm_usage
 
@@ -76,9 +99,21 @@ class BuildSummary:
     failed: int = 0
     skipped_conflicts: int = 0
     stopped: str | None = None  # why the run ended early, if it did
+    planned_job: int = 0  # new outreach started from job matches this run
+    planned_open: int = 0  # ... and from company matches
 
     def as_dict(self) -> dict[str, Any]:
         return {"drafted": self.drafted, "failed": self.failed, "stopped": self.stopped}
+
+
+def split_batch(room: int, share: int, jobs_available: int, open_available: int) -> tuple[int, int]:
+    """(job, open) counts for `room` new drafts: `share`% open outreach, rounded, and when one side
+    has fewer candidates than its share the other fills the gap (PLAN.md §8)."""
+    want_open = round(room * share / 100)
+    take_open = min(want_open, open_available)
+    take_job = min(room - take_open, jobs_available)
+    take_open = min(room - take_job, open_available)
+    return take_job, take_open
 
 
 @dataclass
@@ -129,9 +164,21 @@ def highlights(record: dict[str, Any], limit: int = 2) -> list[str]:
 
 
 class DraftPipeline:
-    def __init__(self, llm: LLMClient, factory: ProviderFactory, now: datetime | None = None) -> None:
+    def __init__(
+        self,
+        llm: LLMClient,
+        factory: ProviderFactory,
+        now: datetime | None = None,
+        *,
+        apollo_factory: ProviderFactory | None = None,
+        fetcher: WebsiteFetcher | None = None,
+    ) -> None:
+        """`apollo_factory` adds Apollo before Hunter for users with an Apollo key; `fetcher` reads a
+        company's website on demand when open outreach has no company text to quote yet."""
         self._llm = llm
         self._factory = factory
+        self._apollo_factory = apollo_factory
+        self._fetcher = fetcher
         self._now = now
         self._lexicon = get_lexicon()
         self._tailor = Tailor(llm, self._lexicon)
@@ -156,10 +203,19 @@ class DraftPipeline:
         user_id = outreach.user_id
         job = await session.get(Job, outreach.job_id) if outreach.job_id else None
         company = await session.get(Company, outreach.company_id)
-        if job is None or company is None:  # open outreach drafting arrives in Phase 8
+        is_open = outreach.campaign_type == CampaignType.OPEN
+        match, target = await self._company_match(session, outreach) if is_open else (None, None)
+        if company is None or (job is None and not is_open) or (is_open and match is None):
             await self._fail(
-                session, outreach, "unsupported", "Only job-linked drafts exist so far.", actor_id
+                session, outreach, "missing_inputs", "Its job or company match no longer exists.", actor_id
             )
+            return
+        if is_open and not await self._has_company_text(session, company):
+            await self._fail(
+                session, outreach, "no_company_context",
+                f"There's no description or website text for {company.name} to base the email on.",
+                actor_id,
+            )  # fmt: skip
             return
         resume_row = await store.get_current(session, user_id)
         if resume_row is None:
@@ -171,8 +227,13 @@ class DraftPipeline:
         except LLMKeyRequiredError as exc:
             raise DraftingPausedError(exc) from exc
 
-        finder = await build_finder(session, user_id, self._factory, self.now())
-        contact = await find_contact_for(session, outreach, job, company, finder, actor_id=actor_id)
+        finder = await build_finder(
+            session, user_id, self._factory, self.now(), apollo_factory=self._apollo_factory
+        )
+        titles = list(target.contact_titles) if target else []
+        contact = await find_contact_for(
+            session, outreach, job, company, finder, actor_id=actor_id, titles=titles
+        )
         if contact is None:
             return  # failed with the contact step's reason
 
@@ -181,7 +242,11 @@ class DraftPipeline:
         if record is None or pdf is None or record.get("resume_version") != resume_row.version:
             try:
                 async with _llm_step(session, user_id, TAILOR_OPERATION):
-                    result = await self._tailor.tailor(master, job, company, api_key)
+                    if job is not None:
+                        result = await self._tailor.tailor(master, job, company, api_key)
+                    else:
+                        brief = await self._brief(session, outreach.user_id, company, match, target)
+                        result = await self._tailor.tailor_open(master, brief, api_key)
             except TailorError as exc:
                 details = "; ".join(i.message for i in exc.issues[:3]) or str(exc)
                 await self._fail(session, outreach, exc.reason, details, actor_id)
@@ -199,9 +264,14 @@ class DraftPipeline:
 
         try:
             async with _llm_step(session, user_id, DRAFT_OPERATION):
-                draft = await self._drafter.draft(
-                    await self._draft_inputs(session, outreach, job, company, contact, master), api_key
-                )
+                if job is not None:
+                    inputs = await self._draft_inputs(session, outreach, job, company, contact, master)
+                    draft = await self._drafter.draft(inputs, api_key)
+                else:
+                    open_inputs = await self._open_draft_inputs(
+                        session, outreach, company, contact, master, match, target
+                    )
+                    draft = await self._drafter.draft_open(open_inputs, api_key)
         except DraftError as exc:
             await self._fail(
                 session, outreach, exc.reason, "; ".join(i.message for i in exc.issues), actor_id
@@ -219,6 +289,75 @@ class DraftPipeline:
             OutreachStatus.PENDING_REVIEW,
             actor_id=actor_id,
             payload={"subject": draft.subject},
+        )
+
+    async def _company_match(
+        self, session: AsyncSession, outreach: Outreach
+    ) -> tuple[CompanyMatch | None, ProspectTarget | None]:
+        match = (
+            await session.get(CompanyMatch, outreach.company_match_id) if outreach.company_match_id else None
+        )
+        target = (
+            await session.get(ProspectTarget, match.prospect_target_id)
+            if match and match.prospect_target_id
+            else None
+        )
+        return match, target
+
+    async def _has_company_text(self, session: AsyncSession, company: Company) -> bool:
+        """Open outreach quotes the company's own text; read its website now if there's none yet."""
+        if company.description or company.website_text:
+            return True
+        if self._fetcher is None or not company.domain or company.website_fetched_at is not None:
+            return False
+        text = await self._fetcher.fetch(company.domain)
+        company.website_fetched_at = self.now()
+        if text:
+            company.website_text = text
+            company.embedding = None
+        await session.flush()
+        return bool(text)
+
+    async def _brief(
+        self,
+        session: AsyncSession,
+        user_id: uuid.UUID,
+        company: Company,
+        match: CompanyMatch | None,
+        target: ProspectTarget | None,
+    ) -> OpenBrief:
+        prefs = await load_preferences(session, user_id)
+        about = "\n".join(p for p in (company.description, company.website_text) if p)
+        return OpenBrief(
+            company=company.name,
+            target_roles=list(target.target_roles if target and target.target_roles else prefs.target_roles),
+            about=about,
+            angle=match.angle if match else "",
+        )
+
+    async def _open_draft_inputs(
+        self,
+        session: AsyncSession,
+        outreach: Outreach,
+        company: Company,
+        contact: Contact,
+        master: MasterResume,
+        match: CompanyMatch | None,
+        target: ProspectTarget | None,
+        hint: str | None = None,
+    ) -> OpenDraftInputs:
+        prefs = await load_preferences(session, outreach.user_id)
+        return OpenDraftInputs(
+            company=company,
+            contact=contact,
+            basics=master.basics,
+            about_me=prefs.about_me,
+            highlights=highlights(outreach.tailored_resume or {}),
+            skills=master_skill_set(master, self._lexicon),
+            angle=match.angle if match else "",
+            target_roles=list(target.target_roles if target and target.target_roles else prefs.target_roles),
+            employment_types=list(prefs.employment_types),
+            hint=hint,
         )
 
     async def _draft_inputs(
@@ -252,31 +391,43 @@ class DraftPipeline:
         company = await session.get(Company, outreach.company_id)
         contact = await session.get(Contact, outreach.contact_id) if outreach.contact_id else None
         resume_row = await store.get_current(session, outreach.user_id)
-        if job is None or company is None or contact is None or resume_row is None:
+        is_open = outreach.campaign_type == CampaignType.OPEN
+        if (job is None and not is_open) or company is None or contact is None or resume_row is None:
             raise DraftError("missing_inputs", "This draft is missing its job, contact or resume.")
         master = MasterResume.model_validate(resume_row.data)
         with metered() as meter:
             try:
-                inputs = await self._draft_inputs(session, outreach, job, company, contact, master, hint)
-                draft = await self._drafter.draft(inputs, api_key)
+                if job is not None:
+                    inputs = await self._draft_inputs(session, outreach, job, company, contact, master, hint)
+                    draft = await self._drafter.draft(inputs, api_key)
+                else:
+                    match, target = await self._company_match(session, outreach)
+                    open_inputs = await self._open_draft_inputs(
+                        session, outreach, company, contact, master, match, target, hint
+                    )
+                    draft = await self._drafter.draft_open(open_inputs, api_key)
             finally:
                 await record_llm_usage(session, outreach.user_id, DRAFT_OPERATION, meter.calls)
         return draft.subject, draft.body, draft.personalization_source
 
     # --- The daily batch ---------------------------------------------------------------------------
 
-    async def _candidates(self, session: AsyncSession, user_id: uuid.UUID, limit: int) -> list[JobMatch]:
-        """The user's best undrafted matches, shortlisted first, one per company, skipping companies
-        with an active outreach (invariant 4) or one emailed in the last 90 days."""
-        prefs = await load_preferences(session, user_id)
-        now = self.now()
-        busy = select(Outreach.company_id).where(
+    def _busy_companies(self, user_id: uuid.UUID) -> Any:
+        """Companies with an active outreach (invariant 4) or one emailed in the last 90 days."""
+        return select(Outreach.company_id).where(
             Outreach.user_id == user_id,
             or_(
                 Outreach.status.not_in(INACTIVE_OUTREACH_STATUSES),
-                Outreach.sent_at >= now - timedelta(days=RECENTLY_SENT_DAYS),
+                Outreach.sent_at >= self.now() - timedelta(days=RECENTLY_SENT_DAYS),
             ),
         )
+
+    async def _candidates(
+        self, session: AsyncSession, user_id: uuid.UUID, limit: int
+    ) -> list[tuple[JobMatch, Job]]:
+        """The user's best undrafted job matches, shortlisted first, one per company, skipping busy
+        companies."""
+        prefs = await load_preferences(session, user_id)
         rows = (
             await session.execute(
                 select(JobMatch, Job)
@@ -285,13 +436,13 @@ class DraftPipeline:
                     JobMatch.user_id == user_id,
                     JobMatch.status.in_([JobMatchStatus.NEW, JobMatchStatus.SHORTLISTED]),
                     JobMatch.llm_score >= prefs.min_fit_score,
-                    Job.company_id.not_in(busy),
+                    Job.company_id.not_in(self._busy_companies(user_id)),
                     *hard_filter_conditions(
                         user_id,
                         max_job_age_days=prefs.max_job_age_days,
                         employment_types=list(prefs.employment_types),
                         company_stages=list(prefs.company_stages),
-                        now=now,
+                        now=self.now(),
                     ),
                 )
                 .order_by(
@@ -302,17 +453,73 @@ class DraftPipeline:
                 .limit(limit * 5)
             )
         ).all()
-        chosen: list[JobMatch] = []
+        chosen: list[tuple[JobMatch, Job]] = []
         companies: set[uuid.UUID] = set()
         for match, job in rows:
             if job.company_id not in companies:
                 companies.add(job.company_id)
-                chosen.append(match)
+                chosen.append((match, job))
         return chosen[:limit]
+
+    async def _company_candidates(
+        self, session: AsyncSession, user_id: uuid.UUID, limit: int
+    ) -> list[CompanyMatch]:
+        """The user's best company matches for open outreach: queued first, then by score, from
+        active targets, skipping busy and blocked companies."""
+        if limit <= 0:
+            return []
+        prefs = await load_preferences(session, user_id)
+        blocked = select(UserCompanyBlock.company_id).where(UserCompanyBlock.user_id == user_id)
+        return list(
+            (
+                await session.scalars(
+                    select(CompanyMatch)
+                    .join(ProspectTarget, ProspectTarget.id == CompanyMatch.prospect_target_id)
+                    .where(
+                        CompanyMatch.user_id == user_id,
+                        ProspectTarget.is_active.is_(True),
+                        CompanyMatch.status.in_([CompanyMatchStatus.NEW, CompanyMatchStatus.QUEUED]),
+                        CompanyMatch.score >= prefs.min_fit_score,
+                        CompanyMatch.company_id.not_in(self._busy_companies(user_id)),
+                        CompanyMatch.company_id.not_in(blocked),
+                    )
+                    .order_by(
+                        (CompanyMatch.status == CompanyMatchStatus.QUEUED).desc(),
+                        CompanyMatch.score.desc(),
+                        CompanyMatch.created_at,
+                    )
+                    .limit(limit)
+                )
+            ).all()
+        )
+
+    async def plan_batch(
+        self, session: AsyncSession, user_id: uuid.UUID, room: int
+    ) -> list[tuple[JobMatch, Job] | CompanyMatch]:
+        """Up to `room` new items, split by `open_outreach_share` (the other side fills a gap), never
+        two for the same company, alternating so a run cut short still covers both modes."""
+        if room <= 0:
+            return []
+        prefs = await load_preferences(session, user_id)
+        jobs = await self._candidates(session, user_id, room)
+        job_companies = {job.company_id for _, job in jobs}
+        companies = [
+            c
+            for c in await self._company_candidates(session, user_id, room + len(jobs))
+            if c.company_id not in job_companies
+        ]
+        take_job, take_open = split_batch(room, prefs.open_outreach_share, len(jobs), len(companies))
+        picked_jobs: list[tuple[JobMatch, Job] | CompanyMatch] = list(jobs[:take_job])
+        picked_open: list[tuple[JobMatch, Job] | CompanyMatch] = list(companies[:take_open])
+        plan: list[tuple[JobMatch, Job] | CompanyMatch] = []
+        for i in range(max(len(picked_jobs), len(picked_open))):
+            plan += [*picked_jobs[i : i + 1], *picked_open[i : i + 1]]
+        return plan
 
     async def build_for_user(self, session: AsyncSession, user_id: uuid.UUID) -> BuildSummary:
         """Fill the user's review queue up to `daily_draft_batch`: first resume outreach left in
-        `drafting`, then start new ones from the best matches. Commits after every item."""
+        `drafting`, then start new ones from the best job and company matches. Commits after every
+        item."""
         summary = BuildSummary()
         prefs = await load_preferences(session, user_id)
         if prefs.paused:
@@ -345,24 +552,26 @@ class DraftPipeline:
                 )
             ).all()
         )
-        queue: list[Outreach | JobMatch] = [*resumable]
-        if len(queue) < room:
-            queue += await self._candidates(session, user_id, room - len(queue))
+        queue: list[Outreach | tuple[JobMatch, Job] | CompanyMatch] = [*resumable]
+        planned = await self.plan_batch(session, user_id, room - len(queue))
+        summary.planned_job = sum(1 for item in planned if isinstance(item, tuple))
+        summary.planned_open = len(planned) - summary.planned_job
+        queue += planned
 
         for item in queue:
-            if isinstance(item, JobMatch):
-                job = await session.get(Job, item.job_id)
-                if job is None:
-                    continue
+            if isinstance(item, Outreach):
+                outreach = item
+            else:
                 try:
-                    outreach = await start_job_outreach(session, user_id, item, job)
+                    if isinstance(item, CompanyMatch):
+                        outreach = await start_open_outreach(session, user_id, item)
+                    else:
+                        outreach = await start_job_outreach(session, user_id, *item)
                 except OutreachConflictError:
                     await session.rollback()
                     summary.skipped_conflicts += 1
                     continue
                 await session.commit()
-            else:
-                outreach = item
             try:
                 await self.run(session, outreach, actor_id=None)
             except DraftingPausedError as exc:

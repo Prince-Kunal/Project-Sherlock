@@ -97,7 +97,7 @@ export function AllJobs() {
         <p className="text-destructive text-sm">{errorMessage(jobs.error)}</p>
       )}
 
-      <div className="overflow-x-auto rounded-xl border">
+      <div className="bg-surface ring-foreground/[0.07] shadow-soft overflow-x-auto rounded-2xl ring-1">
         <table className="w-full min-w-[720px] text-sm">
           <thead className="bg-muted/50 text-muted-foreground text-left text-xs">
             <tr>
@@ -172,7 +172,7 @@ export function AllJobs() {
                   colSpan={6}
                   className="text-muted-foreground px-3 py-10 text-center"
                 >
-                  Loading…
+                  Reading the job boards…
                 </td>
               </tr>
             )}

@@ -16,7 +16,7 @@ from tests.sending_fixtures import MONDAY_11_IST, sendable
 
 S = OutreachStatus
 NUDGE = {
-    "body": "Following up on my note last week about the backend intern role. If a referral isn't "
+    "body": "Following up on my note last week about interning with your team. If that isn't "
     "possible, a pointer to whoever's hiring would help a lot."
 }
 

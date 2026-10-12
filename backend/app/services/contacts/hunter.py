@@ -130,7 +130,9 @@ class HunterProvider(ContactProvider):
             raise ContactQuotaError(message)
         raise ContactProviderError(message)
 
-    async def search_people(self, *, domain: str | None = None, company: str | None = None) -> PeopleSearch:
+    async def search_people(
+        self, *, domain: str | None = None, company: str | None = None, titles: list[str] | None = None
+    ) -> PeopleSearch:
         if not domain and not company:
             raise ValueError("search_people needs a domain or a company name")
         params: dict[str, Any] = {

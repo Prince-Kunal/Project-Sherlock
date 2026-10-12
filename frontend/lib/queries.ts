@@ -27,6 +27,15 @@ import type {
   ReviewStats,
   TailorPreview,
   TimelineEntry,
+  ApolloKeyStatus,
+  CampaignType,
+  CompanyBrief,
+  CompanyMatch,
+  CompanyMatchFeed,
+  CompanyMatchFilters,
+  ProspectOptions,
+  ProspectTarget,
+  ProspectTargetIn,
 } from "@/lib/types";
 
 export const keys = {
@@ -167,7 +176,9 @@ export function useDeleteLlmKey() {
   });
 }
 
-function toQuery(filters: JobFilters | MatchFilters): string {
+function toQuery(
+  filters: JobFilters | MatchFilters | CompanyMatchFilters,
+): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
     if (value !== undefined && value !== "") params.set(key, String(value));
@@ -330,13 +341,15 @@ export function useReviewStats() {
 export function useOutreachList(
   statuses: OutreachStatus[],
   outcomes: Outcome[] = [],
+  mode: CampaignType | null = null,
 ) {
   const query = [
     ...statuses.map((s) => `status=${s}`),
     ...outcomes.map((o) => `outcome=${o}`),
+    ...(mode ? [`campaign_type=${mode}`] : []),
   ].join("&");
   return useQuery({
-    queryKey: ["outreach", "list", statuses, outcomes],
+    queryKey: ["outreach", "list", statuses, outcomes, mode],
     queryFn: () => apiFetch<OutreachList>(`/outreach?${query}&limit=200`),
   });
 }
@@ -500,5 +513,148 @@ export function useRemoveAllowedEmail() {
       }),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["admin", "allowed-emails"] }),
+  });
+}
+
+// --- Open outreach (Phase 8) ----------------------------------------------------
+
+export function useTargets() {
+  return useQuery({
+    queryKey: ["prospects", "targets"],
+    queryFn: () => apiFetch<ProspectTarget[]>("/prospects/targets"),
+  });
+}
+
+export function useSaveTarget() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: ProspectTargetIn & { id?: string }) =>
+      apiFetch<ProspectTarget>(
+        id ? `/prospects/targets/${id}` : "/prospects/targets",
+        { method: id ? "PUT" : "POST", body: JSON.stringify(body) },
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["prospects"] }),
+  });
+}
+
+export function useDeleteTarget() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<void>(`/prospects/targets/${id}`, { method: "DELETE" }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["prospects"] }),
+  });
+}
+
+export function useProspectOptions() {
+  return useQuery({
+    queryKey: ["prospects", "options"],
+    queryFn: () => apiFetch<ProspectOptions>("/prospects/options"),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useCompanySearch(q: string) {
+  const query = q.trim();
+  return useQuery({
+    queryKey: ["prospects", "company-search", query],
+    queryFn: () =>
+      apiFetch<CompanyBrief[]>(
+        `/prospects/companies/search?q=${encodeURIComponent(query)}`,
+      ),
+    enabled: query.length >= 2,
+    placeholderData: (previous) => previous,
+  });
+}
+
+export function useAddCompany() {
+  return useMutation({
+    mutationFn: (domain: string) =>
+      apiFetch<CompanyBrief>("/prospects/companies", {
+        method: "POST",
+        body: JSON.stringify({ domain }),
+      }),
+  });
+}
+
+export function useCompanyMatches(filters: CompanyMatchFilters) {
+  return useQuery({
+    queryKey: ["prospects", "matches", filters],
+    queryFn: () =>
+      apiFetch<CompanyMatchFeed>(`/prospects/matches?${toQuery(filters)}`),
+    placeholderData: (previous) => previous,
+  });
+}
+
+export type CompanyMatchAction = "queue" | "hide" | "restore";
+
+export function useCompanyMatchAction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, action }: { id: string; action: CompanyMatchAction }) =>
+      apiFetch<CompanyMatch>(`/prospects/matches/${id}/${action}`, {
+        method: "POST",
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["prospects", "matches"],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["outreach", "stats"] });
+    },
+  });
+}
+
+/** "Draft now" on a company: contact → tailor → draft, synchronously. */
+export function useDraftCompanyNow() {
+  const onChanged = useOnOutreachChanged();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (matchId: string) =>
+      apiFetch<OutreachDetail>(`/prospects/matches/${matchId}/draft`, {
+        method: "POST",
+      }),
+    onSuccess: (detail) => {
+      onChanged(detail);
+      void queryClient.invalidateQueries({
+        queryKey: ["prospects", "matches"],
+      });
+    },
+  });
+}
+
+export function useFindCompanies() {
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<{ queued: boolean }>("/prospects/refresh", { method: "POST" }),
+  });
+}
+
+export function useApolloKey() {
+  return useQuery({
+    queryKey: ["settings", "apollo-key"],
+    queryFn: () => apiFetch<ApolloKeyStatus>("/settings/apollo-key"),
+  });
+}
+
+export function useSaveApolloKey() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (apiKey: string) =>
+      apiFetch<ApolloKeyStatus>("/settings/apollo-key", {
+        method: "PUT",
+        body: JSON.stringify({ api_key: apiKey }),
+      }),
+    onSuccess: (status) =>
+      queryClient.setQueryData(["settings", "apollo-key"], status),
+  });
+}
+
+export function useDeleteApolloKey() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<void>("/settings/apollo-key", { method: "DELETE" }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["settings", "apollo-key"] }),
   });
 }

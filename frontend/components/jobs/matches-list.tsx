@@ -14,12 +14,15 @@ import { useState } from "react";
 
 import { ContactPanel } from "@/components/jobs/contact-panel";
 import { DraftNowButton } from "@/components/jobs/draft-now";
+import { EmptyState } from "@/components/empty-state";
 import { TailorPreviewButton } from "@/components/jobs/tailor-preview";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ListSkeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import { errorMessage } from "@/lib/api";
+import { CANON } from "@/lib/canon";
 import { age, selectClass, TYPE_LABELS } from "@/lib/jobs";
 import {
   useBlockCompany,
@@ -28,6 +31,7 @@ import {
   useRefreshMatches,
 } from "@/lib/queries";
 import type { Match, MatchFilters } from "@/lib/types";
+import { scoreClass } from "@/lib/score";
 
 const PAGE_SIZE = 30;
 
@@ -37,15 +41,6 @@ const STATUS_OPTIONS: { value: MatchFilters["status"]; label: string }[] = [
   { value: "hidden", label: "Hidden" },
   { value: "expired", label: "Expired" },
 ];
-
-function scoreClass(score: number | null): string {
-  if (score === null) return "bg-muted text-muted-foreground";
-  if (score >= 85)
-    return "bg-emerald-600 text-white dark:bg-emerald-500 dark:text-emerald-950";
-  if (score >= 70) return "bg-primary text-primary-foreground";
-  if (score >= 50) return "bg-amber-500 text-amber-950";
-  return "bg-muted text-muted-foreground";
-}
 
 export function MatchesList() {
   const [filters, setFilters] = useState<MatchFilters>({
@@ -171,24 +166,24 @@ export function MatchesList() {
       </ul>
 
       {data && data.items.length === 0 && (
-        <div className="text-muted-foreground rounded-xl border border-dashed px-4 py-10 text-center text-sm">
-          {filters.status === "active" ? (
-            <>
-              No matches at {filters.min_score ?? userMin}+ yet. Sherlock scores
-              new jobs after each poll (every 6 hours), up to{" "}
+        <EmptyState
+          title={
+            filters.status === "active"
+              ? `No matches at ${filters.min_score ?? userMin}+ yet.`
+              : "Nothing here."
+          }
+          quote={filters.status === "active" ? CANON.data : undefined}
+        >
+          {filters.status === "active" && (
+            <p>
+              Sherlock scores new jobs after each poll (every 6 hours), up to{" "}
               {data.scoring.daily_limit} requests a day. Try a lower fit score,
-              or check “All jobs”.
-            </>
-          ) : (
-            "Nothing here."
+              or browse “All jobs”.
+            </p>
           )}
-        </div>
+        </EmptyState>
       )}
-      {matches.isPending && (
-        <p className="text-muted-foreground py-10 text-center text-sm">
-          Loading…
-        </p>
-      )}
+      {matches.isPending && <ListSkeleton />}
 
       {total > PAGE_SIZE && (
         <div className="text-muted-foreground flex items-center justify-between text-sm">
@@ -237,10 +232,10 @@ function MatchRow({ match }: { match: Match }) {
   const editable = ["new", "shortlisted", "hidden"].includes(match.status);
 
   return (
-    <li className="bg-card rounded-xl border p-3 sm:p-4">
+    <li className="bg-card ring-foreground/[0.07] shadow-soft hover:shadow-lift rounded-2xl p-4 ring-1 transition-shadow duration-300 sm:p-5">
       <div className="flex gap-3">
         <div
-          className={`flex size-11 shrink-0 items-center justify-center rounded-lg text-base font-semibold tabular-nums ${scoreClass(match.fit_score)}`}
+          className={`size-11 text-base ${scoreClass(match.fit_score)}`}
           title={
             match.fit_score === null ? "Not scored" : "Fit score out of 100"
           }

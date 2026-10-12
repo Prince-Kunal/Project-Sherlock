@@ -1,19 +1,15 @@
 "use client";
 
+import { PageHeader } from "@/components/page-header";
 import { OutreachTracker } from "@/components/tracker/outreach-tracker";
 
 export default function TrackerPage() {
   return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Outreach tracker
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          Everything you&apos;ve approved: what&apos;s queued, sent, answered
-          and how it turned out.
-        </p>
-      </div>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Outreach tracker"
+        description="Every case you've approved: queued, sent, answered, and how it turned out."
+      />
       <OutreachTracker />
     </div>
   );

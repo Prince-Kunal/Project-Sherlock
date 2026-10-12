@@ -30,15 +30,7 @@ import {
   useReviewAction,
 } from "@/lib/queries";
 import type { OutreachDetail } from "@/lib/types";
-
-export function scoreClass(score: number | null): string {
-  if (score === null) return "bg-muted text-muted-foreground";
-  if (score >= 85)
-    return "bg-emerald-600 text-white dark:bg-emerald-500 dark:text-emerald-950";
-  if (score >= 70) return "bg-primary text-primary-foreground";
-  if (score >= 50) return "bg-amber-500 text-amber-950";
-  return "bg-muted text-muted-foreground";
-}
+import { scoreClass } from "@/lib/score";
 
 /** One draft in review: job, contact, email (editable), tailored resume, and the actions. */
 export function DraftCard({
@@ -55,10 +47,10 @@ export function DraftCard({
   const busy = action.isPending;
 
   return (
-    <article className="bg-card flex flex-col gap-4 rounded-xl border p-4">
+    <article className="bg-card ring-foreground/[0.07] shadow-soft flex flex-col gap-5 rounded-[1.5rem] p-5 ring-1 sm:p-7">
       <JobHeader draft={draft} />
       {draft.send_error && (
-        <p className="border-destructive/40 bg-destructive/5 text-destructive rounded-lg border p-3 text-sm">
+        <p className="border-destructive/25 bg-destructive/[0.06] text-destructive rounded-2xl border px-4 py-3 text-sm">
           The last send didn&apos;t go out: {draft.send_error} Fix it and
           approve again.
         </p>
@@ -80,7 +72,7 @@ export function DraftCard({
       <AttachmentRow draft={draft} />
 
       {inReview && !editing && (
-        <div className="flex flex-col gap-2 border-t pt-3">
+        <div className="flex flex-col gap-2 border-t pt-5">
           {regenerating ? (
             <RegenerateForm
               draftId={draft.id}
@@ -89,6 +81,8 @@ export function DraftCard({
           ) : (
             <div className="flex flex-wrap items-center gap-2">
               <Button
+                variant="brand"
+                size="lg"
                 disabled={busy}
                 onClick={() =>
                   action.mutate(
@@ -127,10 +121,6 @@ export function DraftCard({
               >
                 <SkipForward /> Skip
               </Button>
-              <span className="text-muted-foreground ml-auto hidden text-xs sm:inline">
-                <kbd>a</kbd> approve · <kbd>s</kbd> skip · <kbd>j</kbd>/
-                <kbd>k</kbd> next/previous
-              </span>
             </div>
           )}
           {action.isError && (
@@ -141,7 +131,7 @@ export function DraftCard({
         </div>
       )}
       {(draft.status === "approved" || draft.status === "scheduled") && (
-        <p className="flex items-center gap-1.5 border-t pt-3 text-sm text-emerald-700 dark:text-emerald-400">
+        <p className="text-success flex items-center gap-1.5 border-t pt-5 text-sm">
           <CheckCircle2 className="size-4" /> Approved.{" "}
           {draft.scheduled_at
             ? `Goes out around ${new Date(draft.scheduled_at).toLocaleString(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit" })}.`
@@ -153,12 +143,23 @@ export function DraftCard({
   );
 }
 
+export function ModeBadge({ draft }: { draft: { campaign_type: string } }) {
+  return draft.campaign_type === "open" ? (
+    <Badge variant="outline" title="No job is posted at this company">
+      Open outreach
+    </Badge>
+  ) : (
+    <Badge variant="secondary">Job-linked</Badge>
+  );
+}
+
 function JobHeader({ draft }: { draft: OutreachDetail }) {
+  if (draft.campaign_type === "open") return <OpenHeader draft={draft} />;
   const job = draft.job;
   return (
     <header className="flex gap-3">
       <div
-        className={`flex size-11 shrink-0 items-center justify-center rounded-lg text-base font-semibold tabular-nums ${scoreClass(draft.fit_score)}`}
+        className={`size-11 text-base ${scoreClass(draft.fit_score)}`}
         title="Fit score out of 100"
       >
         {draft.fit_score ?? "–"}
@@ -178,6 +179,16 @@ function JobHeader({ draft }: { draft: OutreachDetail }) {
           <span className="font-medium">
             {draft.job_title ?? draft.company.name}
           </span>
+        )}{" "}
+        <ModeBadge draft={draft} />
+        {draft.upgraded_from_open && (
+          <Badge
+            variant="outline"
+            className="ml-1"
+            title="Your first email was open outreach; then they posted this job"
+          >
+            Now a posted job
+          </Badge>
         )}
         <p className="text-muted-foreground text-sm">
           {draft.company.name}
@@ -221,6 +232,52 @@ function JobHeader({ draft }: { draft: OutreachDetail }) {
   );
 }
 
+/** Open outreach: the company, the angle from matching and its own words, instead of a job. */
+function OpenHeader({ draft }: { draft: OutreachDetail }) {
+  const domain = draft.company.domain;
+  return (
+    <header className="flex gap-3">
+      <div
+        className={`size-11 text-base ${scoreClass(draft.fit_score)}`}
+        title="Company fit score out of 100"
+      >
+        {draft.fit_score ?? "–"}
+      </div>
+      <div className="min-w-0 flex-1">
+        {domain ? (
+          <a
+            href={`https://${domain}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-start gap-1 font-medium hover:underline"
+          >
+            {draft.company.name}
+            <ExternalLink className="text-muted-foreground mt-1 size-3 shrink-0" />
+          </a>
+        ) : (
+          <span className="font-medium">{draft.company.name}</span>
+        )}{" "}
+        <ModeBadge draft={draft} />
+        <p className="text-muted-foreground text-sm">
+          No job posted
+          {draft.target_name && ` · target “${draft.target_name}”`}
+        </p>
+        {draft.angle && (
+          <p className="mt-2 text-sm">
+            <span className="text-muted-foreground">Angle: </span>
+            {draft.angle}
+          </p>
+        )}
+        {draft.company_about && (
+          <p className="text-muted-foreground mt-1 text-sm">
+            {draft.company_about}
+          </p>
+        )}
+      </div>
+    </header>
+  );
+}
+
 function ContactBlock({
   draft,
   editable,
@@ -233,7 +290,7 @@ function ContactBlock({
   if (!contact) return null;
 
   return (
-    <section className="bg-muted/30 rounded-lg border p-3 text-sm">
+    <section className="bg-muted/50 rounded-2xl px-4 py-3.5 text-sm">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-muted-foreground text-xs">To</p>
@@ -289,13 +346,14 @@ function EmailView({ draft }: { draft: OutreachDetail }) {
         <p className="text-muted-foreground text-xs">Subject</p>
         <p className="font-medium">{draft.subject}</p>
       </div>
-      <div className="bg-background rounded-lg border p-3 text-sm leading-relaxed whitespace-pre-wrap">
+      <div className="bg-surface ring-foreground/[0.07] rounded-2xl px-5 py-5 text-[0.95rem] leading-7 whitespace-pre-wrap ring-1 sm:px-7 sm:py-6">
         {draft.body}
       </div>
       {draft.style_warnings.length > 0 && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+        <div className="border-brand/35 bg-brand/10 rounded-2xl border px-4 py-3 text-sm">
           <p className="flex items-center gap-1.5 font-medium">
-            <AlertTriangle className="size-4" /> Might read as machine-written
+            <AlertTriangle className="text-brand-ink size-4" /> Might read as
+            machine-written
           </p>
           <ul className="mt-1 list-disc pl-5">
             {draft.style_warnings.map((w) => (
@@ -307,7 +365,10 @@ function EmailView({ draft }: { draft: OutreachDetail }) {
       )}
       {draft.personalization_source && (
         <p className="text-muted-foreground text-xs">
-          Hook based on: “{draft.personalization_source}”
+          {draft.campaign_type === "open"
+            ? "Hook from the company's own website or description"
+            : "Hook based on"}
+          : “{draft.personalization_source}”
         </p>
       )}
     </section>
@@ -455,7 +516,9 @@ function AttachmentRow({ draft }: { draft: OutreachDetail }) {
         )}
         {coverage && total > 0 && (
           <span>
-            ATS match: {coverage.matched.length}/{total} must-haves
+            {draft.campaign_type === "open"
+              ? `Company keywords: ${coverage.matched.length}/${total} on your resume`
+              : `ATS match: ${coverage.matched.length}/${total} must-haves`}
           </span>
         )}
         <Button
@@ -496,7 +559,7 @@ function AttachmentRow({ draft }: { draft: OutreachDetail }) {
         <iframe
           title="Tailored resume"
           src={pdfSrc}
-          className="h-[70vh] w-full rounded-md border bg-white"
+          className="h-[70vh] w-full rounded-2xl border bg-white"
         />
       )}
     </section>

@@ -66,8 +66,9 @@ async def sendable(
         campaign_type=CampaignType.OPEN,
         contact_id=contact.id,
         status=OutreachStatus.PENDING_REVIEW,
-        subject=f"Backend intern role at {row.name}",
-        body=f"Hi Priya,\n\nWould you refer me for the backend intern role? Resume's attached.\n\n{OPT_OUT_LINE}"
+        # Open outreach (no job row needed), so the text never claims an opening (invariant 10).
+        subject=f"Backend interns at {row.name}?",
+        body=f"Hi Priya,\n\nDoes your team take backend interns? Resume's attached.\n\n{OPT_OUT_LINE}"
         "\n\nThanks,\nRohan Das",
         tailored_resume={"ats": {"passed": True, "failures": [], "page_count": 1, "keyword_coverage": None}},
     )

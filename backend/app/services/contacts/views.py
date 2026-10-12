@@ -6,12 +6,13 @@ from datetime import UTC, datetime
 from sqlalchemy import inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Company, Contact, Job, JobMatch, Outreach, OutreachEvent
-from app.models.enums import OutreachEventType, OutreachStatus
+from app.models import Company, CompanyMatch, Contact, Job, JobMatch, Outreach, OutreachEvent, ProspectTarget
+from app.models.enums import CampaignType, OutreachEventType, OutreachStatus
 from app.schemas.jobs import CompanyBrief, JobOut
 from app.schemas.outreach import ContactOut, OutreachDetail, OutreachListItem, OutreachOut, TimelineEntry
 from app.schemas.resume import MasterResume
 from app.schemas.tailor import ResumeChange
+from app.services.email.drafter import opening_claims
 from app.services.email.style import style_issues
 from app.services.resume.ats_check import AtsReport, KeywordCoverage
 
@@ -64,7 +65,7 @@ async def outreach_list_item(session: AsyncSession, outreach: Outreach) -> Outre
         **base.model_dump(),
         subject=outreach.subject,
         job_title=job.title if job else None,
-        fit_score=match.llm_score if match else None,
+        fit_score=match.llm_score if match else await _company_score(session, outreach),
         updated_at=outreach.updated_at,
         scheduled_at=outreach.scheduled_at,
         sent_at=outreach.sent_at,
@@ -99,6 +100,17 @@ async def _send_error(session: AsyncSession, outreach: Outreach) -> str | None:
     return str(payload.get("message") or payload.get("reason") or "The send failed.")
 
 
+async def _company_score(session: AsyncSession, outreach: Outreach) -> int | None:
+    """Open outreach shows the company match's score where job outreach shows the job's."""
+    if outreach.company_match_id is None:
+        return None
+    return await session.scalar(
+        select(CompanyMatch.score).where(
+            CompanyMatch.id == outreach.company_match_id, CompanyMatch.user_id == outreach.user_id
+        )
+    )
+
+
 async def _match_for(session: AsyncSession, outreach: Outreach) -> JobMatch | None:
     if outreach.job_id is None:
         return None
@@ -119,6 +131,19 @@ async def outreach_detail(session: AsyncSession, outreach: Outreach) -> Outreach
         .order_by(OutreachEvent.created_at.desc())
         .limit(1)
     )
+    company_match = (
+        await session.get(CompanyMatch, outreach.company_match_id) if outreach.company_match_id else None
+    )
+    target = (
+        await session.get(ProspectTarget, company_match.prospect_target_id)
+        if company_match and company_match.prospect_target_id
+        else None
+    )
+    upgraded = await session.scalar(
+        select(OutreachEvent.id).where(
+            OutreachEvent.outreach_id == outreach.id, OutreachEvent.type == OutreachEventType.UPGRADED_TO_JOB
+        )
+    )
     return OutreachDetail(
         **item.model_dump(),
         body=outreach.body,
@@ -137,18 +162,41 @@ async def outreach_detail(session: AsyncSession, outreach: Outreach) -> Outreach
         ),
         ats=AtsReport.model_validate(record["ats"]) if record.get("ats") else None,
         approved_at=approved,
-        style_warnings=_style_warnings(outreach, job),
+        style_warnings=_style_warnings(outreach, job, company),
+        company_match_id=outreach.company_match_id,
+        target_name=target.name if target else None,
+        angle=company_match.angle if company_match else None,
+        company_about=company_about(company),
+        upgraded_from_open=upgraded is not None,
     )
 
 
-def _style_warnings(outreach: Outreach, job: Job | None) -> list[str]:
+def company_about(company: Company | None, limit: int = 600) -> str | None:
+    if company is None:
+        return None
+    text = company.description or (company.website_text or "").split("\n\n", 1)[0]
+    text = " ".join(text.split())
+    return (text[:limit].rsplit(" ", 1)[0] + "…" if len(text) > limit else text) or None
+
+
+def _style_warnings(outreach: Outreach, job: Job | None, company: Company | None) -> list[str]:
     if not outreach.body:
         return []
     bullets: list[str] = []
     if (record := outreach.tailored_resume) and (resume := record.get("resume")):
         bullets = [b.text for b in MasterResume.model_validate(resume).all_bullets()]
-    sources = [job.description_text if job else "", *bullets]
-    return [i.message for i in style_issues(outreach.subject or "", outreach.body, sources)]
+    if job is not None:
+        sources = [job.description_text, *bullets]
+    else:
+        sources = [
+            (company.description or "") if company else "",
+            (company.website_text or "") if company else "",
+        ]
+        sources += bullets
+    issues = style_issues(outreach.subject or "", outreach.body, sources)
+    if outreach.campaign_type == CampaignType.OPEN:
+        issues += opening_claims(outreach.subject or "", outreach.body)
+    return [i.message for i in issues]
 
 
 _TITLES = {
@@ -170,6 +218,7 @@ _TITLES = {
     OutreachEventType.FAILED: "Drafting failed",
     OutreachEventType.RETRIED: "Retried",
     OutreachEventType.CONTACT_CHANGED: "Contact set",
+    OutreachEventType.UPGRADED_TO_JOB: "The company posted a matching job",
 }
 
 

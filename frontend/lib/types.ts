@@ -270,16 +270,27 @@ export type OutreachDetail = OutreachListItem & {
   approved_at: string | null;
   /** Phrasing that may read as machine-written (backend services/email/style.py). */
   style_warnings: string[];
+  // Open outreach (Phase 8): shown in place of the job description.
+  company_match_id: string | null;
+  target_name: string | null;
+  angle: string | null;
+  company_about: string | null;
+  /** Sent as open outreach; the company has since posted a matching job. */
+  upgraded_from_open: boolean;
 };
+
+export type CampaignType = "job" | "open";
 
 export type ReviewStats = {
   pending_review: number;
   new_matches: number;
+  new_company_matches: number;
   sent_this_week: number;
   daily_send_cap: number;
   replies: number;
   followups_due: number;
   failed: number;
+  by_mode: Record<CampaignType, { sent: number; replied: number }>;
 };
 
 export type TimelineEntry = {
@@ -307,4 +318,83 @@ export type AllowedEmail = {
   email: string;
   created_at: string;
   signed_up: boolean;
+};
+
+// --- Open outreach (Phase 8; mirrors backend app/schemas/prospects.py) -------
+
+export type CompanySize = "startup" | "mid" | "large";
+
+export type CompanyBrief = { id: string; name: string; domain: string | null };
+
+export type ProspectTargetIn = {
+  name: string;
+  target_roles: string[];
+  contact_titles: string[];
+  industries: string[];
+  locations: string[];
+  company_sizes: CompanySize[];
+  include_companies: string[];
+  exclude_companies: string[];
+  is_active: boolean;
+};
+
+export type ProspectTarget = Omit<
+  ProspectTargetIn,
+  "include_companies" | "exclude_companies"
+> & {
+  id: string;
+  include_companies: CompanyBrief[];
+  exclude_companies: CompanyBrief[];
+  created_at: string;
+};
+
+export type CompanyCard = CompanyBrief & {
+  industry: string | null;
+  industry_tags: string[];
+  hq_location: string | null;
+  size_hint: CompanySize | "unknown";
+  employee_count: number | null;
+  description: string | null;
+  has_website_text: boolean;
+};
+
+export type CompanyMatchStatus = "new" | "queued" | "contacted" | "hidden";
+
+export type CompanyMatch = {
+  id: string;
+  company: CompanyCard;
+  target_id: string | null;
+  target_name: string | null;
+  score: number;
+  angle: string;
+  reasoning: string;
+  status: CompanyMatchStatus;
+  created_at: string;
+  outreach: Outreach | null;
+};
+
+export type CompanyMatchFeed = {
+  items: CompanyMatch[];
+  total: number;
+  min_score: number;
+};
+
+export type CompanyMatchFilters = {
+  status: "active" | CompanyMatchStatus;
+  min_score?: number;
+  target_id?: string;
+  limit: number;
+  offset: number;
+};
+
+export type ProspectOptions = {
+  industries: string[];
+  sizes: CompanySize[];
+  companies_known: number;
+};
+
+export type ApolloKeyStatus = {
+  configured: boolean;
+  verified_at: string | null;
+  searches_this_month: number;
 };

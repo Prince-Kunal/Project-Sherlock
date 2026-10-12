@@ -1,5 +1,7 @@
 """Referral email drafting (PLAN.md Phase 6): smart model with prompts/draft_email.md → EmailDraft →
-deterministic validator (one retry with the issues) → the final email.
+deterministic validator (one retry with the issues) → the final email. Open outreach (Phase 8) uses
+prompts/draft_open_email.md: the hook comes from the company's own text, the ask depends on who the
+contact is, and the validator also rejects any claim that an opening exists (invariant 10).
 
 The model writes only the middle of the email. The greeting ("Hi Priya,"), the opt-out line and the
 signature (name + links) are added here, so the user's personal details never reach the LLM (§3.1)
@@ -19,7 +21,7 @@ from app.schemas.outreach import DraftIssue, EmailDraft
 from app.schemas.resume import Basics
 from app.services.email.style import style_issues
 from app.services.llm.client import LLMClient
-from app.services.llm.prompt_loader import load_prompt
+from app.services.llm.prompt_loader import Prompt, load_prompt
 from app.services.llm.redaction import redact_pii
 from app.services.resume.skills import SkillLexicon, get_lexicon
 
@@ -57,6 +59,38 @@ _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9\"'(])|\n+")
 _BULLET_PREFIX_RE = re.compile(r"^\s*(?:[-*•·]|\d+[.)])\s*")
 _WORD_RE = re.compile(r"[\w'\u2019-]+")
 
+# Invariant 10: an open-outreach email must not claim or imply that a specific opening exists.
+_VACANCY = r"(?:role|position|opening|vacancy|vacancies|req|requisition|internship|job)s?"
+_OPENING_RES = [
+    re.compile(p, re.IGNORECASE)
+    for p in (
+        r"\byour (?:opening|posting|job post(?:ing)?|listing|vacanc(?:y|ies)|open (?:role|position)s?)\b",
+        r"\bthe (?:opening|vacancy|job posting|posting|listing|job ad)\b",
+        rf"\b{_VACANCY} (?:that )?you(?:'ve| have|'re| are)? ?(?:posted|listed|advertised|hiring for|opened)",
+        r"\byou(?:'re| are) (?:currently )?(?:hiring|recruiting)\b",
+        r"\b(?:apply|applying|application) (?:for|to) (?:the|your|this)\b",
+        rf"\b(?:open|current|posted|advertised|listed) {_VACANCY}\b",
+        rf"\b(?:the|this|your) (?:[\w-]+ ){{0,4}}{_VACANCY}\b",
+    )
+]
+
+
+def opening_claims(subject: str, body: str) -> list[DraftIssue]:
+    """Phrases that claim or imply a specific opening exists ("the backend intern role you posted",
+    "your opening", "applying for the position"). Open outreach only."""
+    for text in (subject, body):
+        for pattern in _OPENING_RES:
+            if (found := pattern.search(text)) is not None:
+                return [
+                    DraftIssue(
+                        code="implies_opening",
+                        message=f"No opening is posted at this company: don't write {found.group(0)!r}. "
+                        "Ask whether the team takes people, or about future openings, instead.",
+                    )
+                ]
+    return []
+
+
 ROLE_TONE: dict[RoleCategory, str] = {
     RoleCategory.FOUNDER: "a founder: keep it very short and direct, they read a lot of these",
     RoleCategory.ENG_MANAGER: "an engineering lead: open with your most relevant technical work, briefly",
@@ -64,6 +98,27 @@ ROLE_TONE: dict[RoleCategory, str] = {
     RoleCategory.RECRUITER: "a recruiter: name the role, say plainly why you fit, ask how best to apply",
     RoleCategory.OTHER: "someone who may not be hiring: ask them to point you to the right person",
 }
+
+
+# Open outreach: what to ask, by who the contact is (PLAN.md Phase 8).
+OPEN_ROLE_ASK: dict[RoleCategory, str] = {
+    RoleCategory.FOUNDER: "whether the team is open to taking {person}",
+    RoleCategory.ENG_MANAGER: (
+        "whether they'd be open to a 15-minute chat, or to passing the resume to whoever handles hiring"
+    ),
+    RoleCategory.RECRUITER: "whether there are upcoming openings for {person} they should watch for",
+    RoleCategory.ENGINEER: "whether they could point them to whoever handles hiring for {person}",
+    RoleCategory.OTHER: "whether they could point them to whoever handles hiring for {person}",
+}
+
+
+def looking_for(target_roles: list[str], employment_types: list[str]) -> tuple[str, str]:
+    """("a backend internship" or the target roles, "an intern" / "a junior engineer") for the prompt."""
+    intern = not employment_types or "internship" in employment_types
+    person = "an intern" if intern else "a junior engineer"
+    if target_roles:
+        return " or ".join(target_roles[:2]), person
+    return ("an internship" if intern else "an entry-level engineering role"), person
 
 
 class DraftError(Exception):
@@ -119,6 +174,15 @@ def key_sentences(
 def company_sentences(company: Company, limit: int = 2) -> list[str]:
     text = company.description or ""
     return [redact_pii(s) for s in split_sentences(text) if 30 <= len(s) <= 300][:limit]
+
+
+def open_context_sentences(
+    company: Company, skills: set[str], lexicon: SkillLexicon, limit: int = 4
+) -> list[str]:
+    """Hook candidates for open outreach: sentences from the company's description and website text,
+    those naming the candidate's skills first (PII-redacted, like JD sentences)."""
+    text = "\n".join(p for p in (company.description, company.website_text) if p)
+    return key_sentences(text, skills, lexicon, limit=limit)
 
 
 def first_name(contact: Contact) -> str | None:
@@ -236,6 +300,22 @@ class DraftInputs:
 
 
 @dataclass
+class OpenDraftInputs:
+    """Open outreach: a company and a person there, no job (PLAN.md Phase 8)."""
+
+    company: Company
+    contact: Contact
+    basics: Basics
+    about_me: str
+    highlights: list[str]
+    skills: set[str]
+    angle: str
+    target_roles: list[str]
+    employment_types: list[str]
+    hint: str | None = None
+
+
+@dataclass
 class DraftResult:
     subject: str
     body: str
@@ -254,6 +334,7 @@ class Drafter:
         self._llm = llm
         self._lexicon = lexicon or get_lexicon()
         self._prompt = load_prompt("draft_email")
+        self._open_prompt = load_prompt("draft_open_email")
 
     def contexts(self, inputs: DraftInputs) -> list[str]:
         sentences = key_sentences(inputs.job.description_text, inputs.skills, self._lexicon)
@@ -288,15 +369,74 @@ class Drafter:
         contexts = self.contexts(inputs) or [inputs.job.title]
         variables = self.variables(inputs, contexts)
         sources = [inputs.job.description_text, *inputs.highlights]
+        return await self._draft(
+            self._prompt, variables, contexts, sources, inputs.contact, inputs.basics, api_key
+        )
+
+    def open_contexts(self, inputs: OpenDraftInputs) -> list[str]:
+        return open_context_sentences(inputs.company, inputs.skills, self._lexicon)
+
+    def open_variables(self, inputs: OpenDraftInputs, contexts: list[str]) -> dict[str, Any]:
+        contact = inputs.contact
+        wanted, person = looking_for(inputs.target_roles, inputs.employment_types)
+        payload = {
+            "company": inputs.company.name,
+            "context_sentences": contexts,
+            "angle": redact_pii(inputs.angle),
+            "looking_for": wanted,
+            "recipient": {
+                "title": contact.title or "unknown",
+                "role": contact.role_category.value,
+                "tone": ROLE_TONE[contact.role_category],
+                "ask": OPEN_ROLE_ASK[contact.role_category].format(person=person),
+            },
+            "about_me": redact_pii(inputs.about_me.strip()) or "(not provided)",
+            "highlights": [redact_pii(h) for h in inputs.highlights[:2]],
+        }
+        return {
+            "inputs": json.dumps(payload, ensure_ascii=False, indent=2),
+            "hint": redact_pii(inputs.hint.strip()) if inputs.hint and inputs.hint.strip() else "(none)",
+        }
+
+    async def draft_open(self, inputs: OpenDraftInputs, api_key: str | None) -> DraftResult:
+        """An open-outreach draft: same validator plus invariant 10 (no claim that an opening
+        exists), which is never downgraded to a warning. Raises DraftError("no_company_context")
+        when there's no company text to hook the email on."""
+        contexts = self.open_contexts(inputs)
+        if not contexts:
+            raise DraftError(
+                "no_company_context",
+                f"There's no description or website text for {inputs.company.name} to base the email on.",
+            )
+        variables = self.open_variables(inputs, contexts)
+        sources = [*contexts, *inputs.highlights]
+        return await self._draft(
+            self._open_prompt, variables, contexts, sources, inputs.contact, inputs.basics, api_key,
+            open_outreach=True,
+        )  # fmt: skip
+
+    async def _draft(
+        self,
+        prompt: Prompt,
+        variables: dict[str, Any],
+        contexts: list[str],
+        sources: list[str],
+        contact: Contact,
+        basics: Basics,
+        api_key: str | None,
+        open_outreach: bool = False,
+    ) -> DraftResult:
         feedback = "(none)"
         issues: list[DraftIssue] = []
         for attempt in (1, 2):
-            request = self._prompt.request(
+            request = prompt.request(
                 tier="smart", api_key=api_key, allow_fallback=True, feedback=feedback, **variables
             )
             draft = await self._llm.generate(request, EmailDraft)
-            composed = compose_body(draft, inputs.contact, inputs.basics)
+            composed = compose_body(draft, contact, basics)
             issues = validate_draft(draft, contexts, composed, sources)
+            if open_outreach:
+                issues += opening_claims(draft.subject, draft.body)
             if not issues or (attempt == 2 and all(i.code in STYLE_CODES for i in issues)):
                 return DraftResult(
                     subject=draft.subject.strip(),

@@ -41,6 +41,8 @@ DraftIssueCode = Literal[
     "greeting_or_signoff",
     "sounds_generated",
     "copied_text",
+    "implies_opening",  # open outreach only (invariant 10)
+    "missing_opening",  # an upgraded outreach's follow-up must name the new opening
 ]
 
 
@@ -111,6 +113,12 @@ class OutreachDetail(OutreachListItem):
     ats: AtsReport | None
     approved_at: datetime | None
     style_warnings: list[str]  # machine-sounding phrasing in the current text (services/email/style.py)
+    # Open outreach (Phase 8): shown in place of the job description.
+    company_match_id: uuid.UUID | None = None
+    target_name: str | None = None
+    angle: str | None = None
+    company_about: str | None = None  # the company's own description (or the start of its website text)
+    upgraded_from_open: bool = False  # sent as open outreach, then the company posted a matching job
 
 
 class OutreachList(BaseModel):
@@ -127,14 +135,21 @@ class RegenerateIn(BaseModel):
     hint: str | None = Field(None, max_length=300)
 
 
+class ModeStats(BaseModel):
+    sent: int
+    replied: int
+
+
 class ReviewStats(BaseModel):
     pending_review: int
     new_matches: int
+    new_company_matches: int = 0
     sent_this_week: int
     daily_send_cap: int
     replies: int
     followups_due: int
     failed: int
+    by_mode: dict[CampaignType, ModeStats] = {}  # sent and replied per mode, for reply rates
 
 
 class BuildQueued(BaseModel):

@@ -1,0 +1,68 @@
+[
+  {
+    "fit_score": 65,
+    "angle": "Your Python and REST API development experience aligns with the AI agent ecosystem 100x builds.",
+    "reasoning": "You have solid Python skills and project experience building APIs, which fits AI tooling development. The biggest doubt is that 100x is an extremely small team of three, making cold outreach tough.",
+    "company_ref": "5f7a990c"
+  },
+  {
+    "fit_score": 40,
+    "angle": "Your software engineering background is technical, but AlgoSurg focuses on specialized medical robotics and 3D surgery planning.",
+    "reasoning": "You have strong C++ and Python skills, but no background in medical devices or AR surgery software. The domain is completely outside your resume.",
+    "company_ref": "45c212a4"
+  },
+  {
+    "fit_score": 55,
+    "angle": "Your backend and REST API skills could map onto parts of AlgoTest's options trading platform infrastructure.",
+    "reasoning": "You have built backend APIs and command-line tools, showing good general engineering capability. However, you lack financial engineering or high-frequency trading domain experience.",
+    "company_ref": "4a6a68d8"
+  },
+  {
+    "fit_score": 60,
+    "angle": "Your JavaScript, TypeScript, and React stack aligns with building virtual education infrastructure at AlgoUniversity.",
+    "reasoning": "You have strong frontend and backend web development experience suitable for building teaching platforms. The company is an education startup, so they may not have structured internship programs.",
+    "company_ref": "114cd9a8"
+  },
+  {
+    "fit_score": 62,
+    "angle": "Your full-stack skills in JavaScript, Node.js, and React fit the tech stack used in AccioJob's skilling programs.",
+    "reasoning": "You have experience building full-stack web applications and writing documentation for developers. AccioJob focuses primarily on offline and online tech education rather than core software product engineering.",
+    "company_ref": "560ffc89"
+  },
+  {
+    "fit_score": 58,
+    "angle": "Your REST API and Node.js skills match the web technologies Advantage Club uses for its global employee engagement platform.",
+    "reasoning": "You have built web apps using JavaScript and Node.js, which are common for SaaS platforms. Your resume does not show prior enterprise HR tech or employee benefits experience.",
+    "company_ref": "2e00623c"
+  },
+  {
+    "fit_score": 50,
+    "angle": "Your Python and API development skills are relevant to building marketplace automation tools at 10 By 10.",
+    "reasoning": "You have experience with search and retrieval systems, which touches on matching algorithms. The company is tiny with only 5 employees, making a cold outreach difficult.",
+    "company_ref": "79a18760"
+  },
+  {
+    "fit_score": 63,
+    "angle": "Your full-stack web experience using JavaScript, React, and Node.js fits the technology behind a high-traffic platform like 9GAG.",
+    "reasoning": "You have built interactive web visualizers and APIs that demonstrate good web fundamentals. 9GAG is a massive consumer media network, and your experience is mostly in open-source tooling and search.",
+    "company_ref": "ea89e420"
+  },
+  {
+    "fit_score": 88,
+    "angle": "Your Python programming skills and developer tooling experience align directly with Abstra's platform for automating finance workflows using Python.",
+    "reasoning": "You have strong Python experience and have built complex developer tools and CLI applications. The main doubt is whether an 18-person startup is currently taking on backend interns.",
+    "company_ref": "78aa8bf9"
+  },
+  {
+    "fit_score": 45,
+    "angle": "Your Python and API skills are technical, but 10x builds AI sales systems specifically for dental practices.",
+    "reasoning": "You have general Python backend experience, but dental practice automation is entirely outside your project history. The company is also a very small three-person startup.",
+    "company_ref": "fed8add6"
+  },
+  {
+    "fit_score": 35,
+    "angle": "Your software engineering skills are general-purpose, whereas 1849 bio engineers microbes for synthetic biology and mining.",
+    "reasoning": "You have strong programming skills in C++ and Python, but zero background in biotech, synthetic biology, or mining. The domain is completely unrelated to your work.",
+    "company_ref": "9a7f77f6"
+  }
+]

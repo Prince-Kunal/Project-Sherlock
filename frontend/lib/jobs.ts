@@ -23,4 +23,4 @@ export function age(days: number): string {
 }
 
 export const selectClass =
-  "border-input h-8 rounded-lg border bg-transparent px-2 text-sm";
+  "border-input bg-surface h-9 rounded-[10px] border px-2.5 text-sm transition-[border-color,box-shadow] duration-200 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";

@@ -1,12 +1,16 @@
-"""Find the person to email about a job, with a deliverable address (PLAN.md Phase 5).
+"""Find the person to email at a company, with a deliverable address (PLAN.md Phases 5 and 8).
 
 Order: HN contact hints (when the job came from HN) → contacts already known for the company (reused
-for 60 days without calling the provider) → a fresh people search. Candidates are ranked by
-selector.py and verified lazily; only `valid` or `accept_all` addresses are accepted.
+for 60 days without calling a provider) → a fresh people search, as a waterfall over the providers
+(Apollo first when the user has a key, then Hunter; the next one is only asked when the previous one
+found nobody usable). Candidates are ranked by selector.py, people holding one of the wanted titles
+(an open-outreach target's `contact_titles`) first, and verified lazily; only `valid` or `accept_all`
+addresses are accepted.
 """
 
 import logging
-from dataclasses import dataclass
+from collections.abc import Sequence
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 from sqlalchemy import func, select
@@ -41,8 +45,13 @@ class NoContactError(Exception):
 
 @dataclass
 class FinderUsage:
-    searches: int = 0  # people searches + email finder calls (Hunter "searches")
+    searches: int = 0  # people searches + email finder calls, all providers
     verifications: int = 0
+    searches_by_provider: dict[str, int] = field(default_factory=dict)
+
+    def add_search(self, provider: str) -> None:
+        self.searches += 1
+        self.searches_by_provider[provider] = self.searches_by_provider.get(provider, 0) + 1
 
 
 def size_from_headcount(headcount: str | None) -> tuple[SizeHint, int | None]:
@@ -67,18 +76,28 @@ class ContactFinder:
         now: datetime,
         cache_days: int = 60,
         searches_left: int | None = None,
+        search_first: Sequence[ContactProvider] = (),
     ) -> None:
-        """`provider` None means no usable key: only contacts already in the database are used.
-        `searches_left` caps provider searches (the user's monthly allowance)."""
+        """`provider` (Hunter) searches and verifies; None means no usable key. `search_first` are
+        providers asked before it (Apollo). With no provider at all, only contacts already in the
+        database are used. `searches_left` caps provider searches (the user's monthly allowance)."""
         self._provider = provider
+        self._searchers = [*search_first, *([provider] if provider else [])]
+        self._verifier = next((p for p in self._searchers if p.can_verify), None)
         self._now = now
         self._cache = timedelta(days=cache_days)
         self._searches_left = searches_left
         self.usage = FinderUsage()
 
-    async def find(self, session: AsyncSession, company: Company, job: Job | None = None) -> Contact:
+    async def find(
+        self,
+        session: AsyncSession,
+        company: Company,
+        job: Job | None = None,
+        titles: Sequence[str] = (),
+    ) -> Contact:
         try:
-            return await self._find(session, company, job)
+            return await self._find(session, company, job, list(titles))
         except ContactQuotaError as exc:
             raise NoContactError("contact_quota", "Your Hunter credits for this month are used up.") from exc
         except ContactProviderAuthError as exc:
@@ -86,7 +105,9 @@ class ContactFinder:
         except ContactProviderError as exc:
             raise NoContactError("contact_provider_error", str(exc)) from exc
 
-    async def _find(self, session: AsyncSession, company: Company, job: Job | None) -> Contact:
+    async def _find(
+        self, session: AsyncSession, company: Company, job: Job | None, titles: list[str]
+    ) -> Contact:
         suppressed = frozenset(
             e.lower() for e in (await session.scalars(select(SuppressionEntry.email))).all()
         )
@@ -107,30 +128,68 @@ class ContactFinder:
         fresh = (
             company.contacts_fetched_at is not None and self._now - company.contacts_fetched_at < self._cache
         )
-        if not fresh and self._provider is not None:
-            await self._search(session, self._provider, company, job)
-        contacts = list(
-            (await session.scalars(select(Contact).where(Contact.company_id == company.id))).all()
-        )
-        ranked = rank_contacts(contacts, startup=is_startup(company), eligibility=eligibility)
+        if not fresh and self._searchers:
+            await self._waterfall(session, company, job, titles, eligibility)
+        ranked = await self._ranked(session, company, titles, eligibility)
         for contact in ranked[:MAX_VERIFICATIONS]:
             if await self._deliverable(contact):
                 return contact
 
-        if not fresh and self._provider is None:
+        if not fresh and not self._searchers:
             raise NoContactError(
                 "contact_key_required", "Add your Hunter API key in Settings to look up contacts."
             )
         raise NoContactError("no_contact", f"No suitable contact with a deliverable email at {company.name}.")
 
-    async def _search(
-        self, session: AsyncSession, provider: ContactProvider, company: Company, job: Job | None
+    async def _ranked(
+        self, session: AsyncSession, company: Company, titles: list[str], eligibility: Eligibility
+    ) -> list[Contact]:
+        contacts = list(
+            (await session.scalars(select(Contact).where(Contact.company_id == company.id))).all()
+        )
+        return rank_contacts(contacts, startup=is_startup(company), eligibility=eligibility, titles=titles)
+
+    async def _waterfall(
+        self,
+        session: AsyncSession,
+        company: Company,
+        job: Job | None,
+        titles: list[str],
+        eligibility: Eligibility,
     ) -> None:
-        if self._searches_left is not None and self.usage.searches >= self._searches_left:
-            raise NoContactError("contact_lookup_limit", "You've used this month's contact lookups.")
+        """Ask each provider in turn until one finds someone the selector would pick. A provider that
+        fails is skipped when there's another to ask; the last one's error is raised."""
+        for index, provider in enumerate(self._searchers):
+            last = index == len(self._searchers) - 1
+            if self._searches_left is not None and self.usage.searches >= self._searches_left:
+                if index == 0:
+                    raise NoContactError("contact_lookup_limit", "You've used this month's contact lookups.")
+                break
+            try:
+                await self._search(session, provider, company, job, titles)
+            except ContactProviderError as exc:
+                if last:
+                    raise
+                log.warning("%s search failed for %s, trying the next: %s", provider.name, company.name, exc)
+                continue
+            if await self._ranked(session, company, titles, eligibility):
+                break
+        company.contacts_fetched_at = self._now
+        await session.flush()
+
+    async def _search(
+        self,
+        session: AsyncSession,
+        provider: ContactProvider,
+        company: Company,
+        job: Job | None,
+        titles: list[str],
+    ) -> None:
         domain = company.domain or company_domain_from_url(job.url if job else None)
-        self.usage.searches += 1
-        result = await provider.search_people(domain=domain, company=None if domain else company.name)
+        self.usage.add_search(provider.name)
+        result = await provider.search_people(
+            domain=domain, company=None if domain else company.name, titles=titles or None
+        )
         found = normalize_domain(result.domain)
         if found and not company.domain and not await _domain_taken(session, found, company):
             company.domain = found
@@ -139,7 +198,6 @@ class ContactFinder:
         for person in result.people:
             if person.email:
                 await self._upsert(session, company, person)
-        company.contacts_fetched_at = self._now
         await session.flush()
 
     async def _upsert(self, session: AsyncSession, company: Company, person: PersonCandidate) -> Contact:
@@ -171,10 +229,10 @@ class ContactFinder:
             return True
         if recent and contact.verification_status == VerificationStatus.INVALID:
             return False
-        if self._provider is None:
+        if self._verifier is None:
             return False
         self.usage.verifications += 1
-        contact.verification_status = await self._provider.verify(contact.email)
+        contact.verification_status = await self._verifier.verify(contact.email)
         contact.verified_at = self._now
         return contact.verification_status in ACCEPTED
 

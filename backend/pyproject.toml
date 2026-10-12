@@ -66,7 +66,7 @@ files = ["app"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["arq.*", "pgvector.*", "readability.*"]
+module = ["arq.*", "pgvector.*", "readability.*", "lxml.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

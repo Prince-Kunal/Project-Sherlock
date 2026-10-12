@@ -11,16 +11,33 @@ from app.core.config import get_settings
 from app.core.db import get_session
 from app.core.redis import get_redis
 from app.models.enums import ServiceKeyType
-from app.schemas.settings import GmailStatus, HunterKeyIn, HunterKeyStatus, LLMKeyIn, LLMKeyStatus
+from app.schemas.settings import (
+    ApolloKeyStatus,
+    GmailStatus,
+    HunterKeyIn,
+    HunterKeyStatus,
+    LLMKeyIn,
+    LLMKeyStatus,
+)
 from app.services.contacts.base import ContactProviderAuthError, ContactProviderError
 from app.services.contacts.keys import get_service_key_row, save_service_key
-from app.services.contacts.service import ProviderFactory, contact_searches_this_month
+from app.services.contacts.service import (
+    APOLLO_SEARCH_OPERATION,
+    ProviderFactory,
+    contact_searches_this_month,
+)
 from app.services.email.connection import GmailAccess, get_token_row, gmail_usable, has_gmail_scopes
 from app.services.google.oauth import GoogleOAuth
 from app.services.llm.client import LLMClient
 from app.services.llm.user_keys import FREE_TIER_NOTICE, get_key_row, save_key
 from app.services.matching.pipeline import load_preferences
-from app.services.registry import get_contact_provider_factory, get_google_oauth, get_llm_client
+from app.services.registry import (
+    get_apollo_factory,
+    get_contact_provider_factory,
+    get_google_oauth,
+    get_llm_client,
+)
+from app.services.usage import llm_calls_since
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -111,6 +128,58 @@ async def put_hunter_key(
 @router.delete("/hunter-key", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_hunter_key(user: CurrentUser, session: Session) -> None:
     row = await get_service_key_row(session, user.id, ServiceKeyType.HUNTER)
+    if row is not None:
+        await session.delete(row)
+        await session.commit()
+
+
+# --- Apollo (PLAN.md Phase 8, optional) --------------------------------------------------------------
+
+
+async def _apollo_status(session: AsyncSession, user_id: uuid.UUID) -> ApolloKeyStatus:
+    row = await get_service_key_row(session, user_id, ServiceKeyType.APOLLO)
+    now = datetime.now(UTC)
+    month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    return ApolloKeyStatus(
+        configured=row is not None,
+        verified_at=row.verified_at if row else None,
+        searches_this_month=await llm_calls_since(session, user_id, APOLLO_SEARCH_OPERATION, month),
+    )
+
+
+@router.get("/apollo-key", response_model=ApolloKeyStatus)
+async def get_apollo_key(user: CurrentUser, session: Session) -> ApolloKeyStatus:
+    return await _apollo_status(session, user.id)
+
+
+@router.put("/apollo-key", response_model=ApolloKeyStatus)
+async def put_apollo_key(
+    body: HunterKeyIn,
+    user: CurrentUser,
+    session: Session,
+    factory: Annotated[ProviderFactory, Depends(get_apollo_factory)],
+) -> ApolloKeyStatus:
+    """Optional: with an Apollo key, people are searched on Apollo before Hunter. Checked with
+    Apollo's auth health endpoint (free) before it's stored."""
+    api_key = body.api_key.strip()
+    try:
+        await factory(api_key).check_key()
+    except ContactProviderAuthError as exc:
+        raise api_error(
+            status.HTTP_400_BAD_REQUEST,
+            "apollo_key_invalid",
+            f"Apollo didn't accept this key ({exc}). Search needs an account registered with a work email.",
+        ) from exc
+    except ContactProviderError as exc:
+        raise api_error(status.HTTP_502_BAD_GATEWAY, "apollo_unavailable", "Couldn't reach Apollo.") from exc
+    await save_service_key(session, user.id, ServiceKeyType.APOLLO, api_key)
+    await session.commit()
+    return await _apollo_status(session, user.id)
+
+
+@router.delete("/apollo-key", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_apollo_key(user: CurrentUser, session: Session) -> None:
+    row = await get_service_key_row(session, user.id, ServiceKeyType.APOLLO)
     if row is not None:
         await session.delete(row)
         await session.commit()

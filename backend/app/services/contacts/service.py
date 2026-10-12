@@ -11,10 +11,20 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.models import Company, Contact, Job, JobMatch, Outreach, SuppressionEntry, UsageLedger
+from app.models import (
+    Company,
+    CompanyMatch,
+    Contact,
+    Job,
+    JobMatch,
+    Outreach,
+    SuppressionEntry,
+    UsageLedger,
+)
 from app.models.enums import (
     INACTIVE_OUTREACH_STATUSES,
     CampaignType,
+    CompanyMatchStatus,
     EmailSource,
     JobMatchStatus,
     OutreachEventType,
@@ -23,7 +33,7 @@ from app.models.enums import (
 )
 from app.services.contacts.base import ContactProvider, ContactProviderAuthError, ContactQuotaError
 from app.services.contacts.finder import ACCEPTED, ContactFinder, FinderUsage, NoContactError
-from app.services.contacts.keys import resolve_hunter_key
+from app.services.contacts.keys import resolve_apollo_key, resolve_hunter_key
 from app.services.contacts.selector import COOLDOWN_DAYS, categorize
 from app.services.email.state import record_event, transition
 
@@ -31,6 +41,9 @@ ProviderFactory = Callable[[str], ContactProvider]
 
 SEARCH_OPERATION = "hunter_search"
 VERIFY_OPERATION = "hunter_verify"
+APOLLO_SEARCH_OPERATION = "apollo_search"
+# Every provider's people searches count toward MAX_CONTACT_LOOKUPS_PER_USER_MONTH.
+LOOKUP_OPERATIONS = (SEARCH_OPERATION, APOLLO_SEARCH_OPERATION)
 
 
 class OutreachConflictError(Exception):
@@ -51,7 +64,7 @@ async def contact_searches_this_month(session: AsyncSession, user_id: uuid.UUID,
     total = await session.scalar(
         select(func.coalesce(func.sum(UsageLedger.units), 0)).where(
             UsageLedger.user_id == user_id,
-            UsageLedger.operation == SEARCH_OPERATION,
+            UsageLedger.operation.in_(LOOKUP_OPERATIONS),
             UsageLedger.created_at >= month_start(now),
         )
     )
@@ -59,26 +72,40 @@ async def contact_searches_this_month(session: AsyncSession, user_id: uuid.UUID,
 
 
 async def build_finder(
-    session: AsyncSession, user_id: uuid.UUID, factory: ProviderFactory, now: datetime
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    factory: ProviderFactory,
+    now: datetime,
+    apollo_factory: ProviderFactory | None = None,
 ) -> ContactFinder:
+    """The user's contact waterfall: Apollo first when they saved an Apollo key, then Hunter."""
     settings = get_settings()
     key = await resolve_hunter_key(session, user_id)
+    apollo_key = await resolve_apollo_key(session, user_id) if apollo_factory else None
     used = await contact_searches_this_month(session, user_id, now)
     return ContactFinder(
         factory(key) if key else None,
         now=now,
         cache_days=settings.contact_cache_days,
         searches_left=max(0, settings.max_contact_lookups_per_user_month - used),
+        search_first=[apollo_factory(apollo_key)] if apollo_factory and apollo_key else [],
     )
 
 
 def record_contact_usage(session: AsyncSession, user_id: uuid.UUID, usage: FinderUsage) -> None:
-    """Hunter credits spent (PLAN.md §13: log every paid call). Caller commits."""
-    for operation, units in ((SEARCH_OPERATION, usage.searches), (VERIFY_OPERATION, usage.verifications)):
+    """Provider calls made (PLAN.md §13: log every paid call). Searches are logged per provider;
+    verifications are always Hunter's. Caller commits."""
+    searches = usage.searches_by_provider or ({"hunter": usage.searches} if usage.searches else {})
+    rows = [
+        (UsageProvider.APOLLO, APOLLO_SEARCH_OPERATION, units)
+        if name == UsageProvider.APOLLO.value
+        else (UsageProvider.HUNTER, SEARCH_OPERATION, units)
+        for name, units in searches.items()
+    ]
+    rows.append((UsageProvider.HUNTER, VERIFY_OPERATION, usage.verifications))
+    for provider, operation, units in rows:
         if units:
-            session.add(
-                UsageLedger(user_id=user_id, provider=UsageProvider.HUNTER, operation=operation, units=units)
-            )
+            session.add(UsageLedger(user_id=user_id, provider=provider, operation=operation, units=units))
 
 
 async def start_job_outreach(
@@ -120,6 +147,44 @@ async def start_job_outreach(
     return outreach
 
 
+async def start_open_outreach(session: AsyncSession, user_id: uuid.UUID, match: CompanyMatch) -> Outreach:
+    """Open outreach (PLAN.md Phase 8): the active outreach for this company match, a failed one
+    retried, or a new one in `drafting`. Raises OutreachConflictError if another outreach to the
+    company is active (invariant 4 holds across both modes)."""
+    rows = (
+        await session.scalars(
+            select(Outreach)
+            .where(Outreach.user_id == user_id, Outreach.company_id == match.company_id)
+            .order_by(Outreach.created_at.desc())
+        )
+    ).all()
+    active = next((o for o in rows if o.status not in INACTIVE_OUTREACH_STATUSES), None)
+    if active is not None:
+        if active.company_match_id != match.id or active.campaign_type != CampaignType.OPEN:
+            raise OutreachConflictError("an outreach to this company is already in progress")
+        outreach = active
+    elif (
+        latest := next((o for o in rows if o.company_match_id == match.id), None)
+    ) and latest.status == OutreachStatus.FAILED:
+        await transition(session, latest, OutreachStatus.DRAFTING, actor_id=user_id)
+        outreach = latest
+    else:
+        outreach = Outreach(
+            user_id=user_id,
+            campaign_type=CampaignType.OPEN,
+            company_id=match.company_id,
+            company_match_id=match.id,
+            status=OutreachStatus.DRAFTING,
+        )
+        session.add(outreach)
+        try:
+            await session.flush()
+        except IntegrityError as exc:
+            raise OutreachConflictError("an outreach to this company is already in progress") from exc
+    match.status = CompanyMatchStatus.CONTACTED
+    return outreach
+
+
 async def find_contact_for(
     session: AsyncSession,
     outreach: Outreach,
@@ -127,12 +192,14 @@ async def find_contact_for(
     company: Company,
     finder: ContactFinder,
     actor_id: uuid.UUID | None,
+    titles: list[str] | None = None,
 ) -> Contact | None:
-    """Attach the best contact, or move the outreach to `failed` with the reason. Caller commits."""
+    """Attach the best contact (people holding one of `titles` first), or move the outreach to
+    `failed` with the reason. Caller commits."""
     if outreach.contact_id is not None:
         return await session.get(Contact, outreach.contact_id)
     try:
-        contact = await finder.find(session, company, job)
+        contact = await finder.find(session, company, job, titles or [])
     except NoContactError as exc:
         await transition(
             session, outreach, OutreachStatus.FAILED, actor_id=actor_id, failure_reason=exc.reason,

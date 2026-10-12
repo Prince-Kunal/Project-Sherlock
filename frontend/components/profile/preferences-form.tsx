@@ -178,14 +178,6 @@ function PreferencesFields({ initial }: { initial: Preferences }) {
           value={p.followup_after_days}
           onChange={(followup_after_days) => set({ followup_after_days })}
         />
-        <NumberField
-          label="Open outreach share (%)"
-          hint="Share of daily drafts without a posted job"
-          min={0}
-          max={100}
-          value={p.open_outreach_share}
-          onChange={(open_outreach_share) => set({ open_outreach_share })}
-        />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">

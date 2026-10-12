@@ -133,8 +133,10 @@ def normalize_domain(domain: str | None) -> str | None:
     if not domain:
         return None
     domain = domain.strip().lower()
-    domain = re.sub(r"^[a-z]+://", "", domain).split("/")[0]
-    return domain.removeprefix("www.") or None
+    # The first site when several are listed ("a.io, https://b.io"); no path, query or fragment.
+    domain = re.split(r"[,;\s]", domain, maxsplit=1)[0]
+    domain = re.split(r"[/?#]", re.sub(r"^[a-z]+://", "", domain), maxsplit=1)[0]
+    return domain.removeprefix("www.").rstrip(".") or None
 
 
 def dedupe_hash(company_domain: str | None, company_name: str, title: str, location: str | None) -> str:
