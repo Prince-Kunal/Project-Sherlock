@@ -11,6 +11,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import api_error, llm_errors
+from app.api.quota import WithinQuota
 from app.api.routes.outreach import run_pipeline
 from app.core.auth import CurrentUser
 from app.core.config import get_settings
@@ -150,7 +151,9 @@ class RefreshQueued(BaseModel):
     queued: bool
 
 
-@router.post("/refresh", response_model=RefreshQueued, status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/refresh", response_model=RefreshQueued, status_code=status.HTTP_202_ACCEPTED, dependencies=[WithinQuota]
+)
 async def refresh_matches(user: CurrentUser) -> RefreshQueued:
     """Score new jobs for this user now instead of waiting for the next poll."""
     job_id = await enqueue("match_jobs_for_users", str(user.id), job_id=f"match_jobs:{user.id}")
@@ -211,7 +214,7 @@ async def restore(match_id: uuid.UUID, user: CurrentUser, session: Session) -> M
 # --- Tailored resume preview (PLAN.md Phase 4; the full draft pipeline arrives in Phase 6) ---------
 
 
-@router.post("/{match_id}/tailor-preview", response_model=TailorPreviewOut)
+@router.post("/{match_id}/tailor-preview", response_model=TailorPreviewOut, dependencies=[WithinQuota])
 async def tailor_preview(
     match_id: uuid.UUID,
     user: CurrentUser,
@@ -270,7 +273,7 @@ async def tailored_pdf(match_id: uuid.UUID, user: CurrentUser, session: Session)
 # --- Contact discovery (PLAN.md Phase 5) -----------------------------------------------------------
 
 
-@router.post("/{match_id}/find-contact", response_model=OutreachOut)
+@router.post("/{match_id}/find-contact", response_model=OutreachOut, dependencies=[WithinQuota])
 async def find_contact(
     match_id: uuid.UUID,
     user: CurrentUser,
@@ -299,7 +302,7 @@ async def find_contact(
 # --- Manual pipeline (PLAN.md Phase 6) ------------------------------------------------------------
 
 
-@router.post("/{match_id}/draft", response_model=OutreachDetail)
+@router.post("/{match_id}/draft", response_model=OutreachDetail, dependencies=[WithinQuota])
 async def draft_now(
     match_id: uuid.UUID,
     user: CurrentUser,

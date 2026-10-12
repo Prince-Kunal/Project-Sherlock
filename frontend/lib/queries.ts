@@ -36,6 +36,13 @@ import type {
   ProspectOptions,
   ProspectTarget,
   ProspectTargetIn,
+  OnboardingStatus,
+  QuotaStatus,
+  RegistryCompany,
+  RegistryCompanyIn,
+  SuppressionEntry,
+  SuppressionPage,
+  UsageReport,
 } from "@/lib/types";
 
 export const keys = {
@@ -656,5 +663,104 @@ export function useDeleteApolloKey() {
       apiFetch<void>("/settings/apollo-key", { method: "DELETE" }),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["settings", "apollo-key"] }),
+  });
+}
+
+// --- Phase 9: quotas, account, onboarding, admin ---------------------------------
+
+export function useQuota() {
+  return useQuery({
+    queryKey: ["settings", "quota"],
+    queryFn: () => apiFetch<QuotaStatus>("/settings/quota"),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useDeleteAccount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (confirmEmail: string) =>
+      apiFetch<void>("/settings/account", {
+        method: "DELETE",
+        body: JSON.stringify({ confirm_email: confirmEmail }),
+      }),
+    onSuccess: () => queryClient.clear(),
+  });
+}
+
+export function useOnboarding() {
+  return useQuery({
+    queryKey: ["onboarding"],
+    queryFn: () => apiFetch<OnboardingStatus>("/onboarding"),
+  });
+}
+
+export function useCompleteOnboarding() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (start: boolean) =>
+      apiFetch<OnboardingStatus>("/onboarding/complete", {
+        method: "POST",
+        body: JSON.stringify({ start }),
+      }),
+    onSuccess: async (status) => {
+      queryClient.setQueryData(["onboarding"], status);
+      await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+    },
+  });
+}
+
+export function useAdminUsage(month: string | null) {
+  return useQuery({
+    queryKey: ["admin", "usage", month],
+    queryFn: () =>
+      apiFetch<UsageReport>(
+        month ? `/admin/usage?month=${month}` : "/admin/usage",
+      ),
+    placeholderData: (previous) => previous,
+  });
+}
+
+export function useSuppressionList(q: string) {
+  return useQuery({
+    queryKey: ["admin", "suppression", q],
+    queryFn: () =>
+      apiFetch<SuppressionPage>(
+        `/admin/suppression?limit=200${q ? `&q=${encodeURIComponent(q)}` : ""}`,
+      ),
+    placeholderData: (previous) => previous,
+  });
+}
+
+export function useAddSuppression() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (email: string) =>
+      apiFetch<SuppressionEntry>("/admin/suppression", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["admin", "suppression"] }),
+  });
+}
+
+export function useRegistryCompanies() {
+  return useQuery({
+    queryKey: ["admin", "companies"],
+    queryFn: () => apiFetch<RegistryCompany[]>("/admin/companies"),
+  });
+}
+
+export function useAddRegistryCompany() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (company: RegistryCompanyIn) =>
+      apiFetch<RegistryCompany>("/admin/companies", {
+        method: "POST",
+        body: JSON.stringify(company),
+      }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["admin", "companies"] }),
   });
 }

@@ -30,6 +30,7 @@ class User(TimestampedBase):
     is_admin: Mapped[bool] = mapped_column(Boolean, server_default=false())
     is_active: Mapped[bool] = mapped_column(Boolean, server_default=true())
     timezone: Mapped[str] = mapped_column(String(64), server_default="Asia/Kolkata")
+    onboarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # finished /welcome
 
 
 class AllowedEmail(TimestampedBase):

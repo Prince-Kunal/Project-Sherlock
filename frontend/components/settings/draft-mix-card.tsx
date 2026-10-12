@@ -52,8 +52,8 @@ export function DraftMixCard() {
         {prefs.data && (
           <p className="text-muted-foreground text-sm">
             Of your {batch} drafts a day: about {batch - open} job-linked and{" "}
-            {open} open outreach. Change the number of drafts in Profile and
-            resume → preferences.
+            {open} open outreach. Change the number of drafts under Schedule
+            above.
           </p>
         )}
         <div className="flex items-center gap-3">

@@ -26,6 +26,7 @@ from redis.asyncio import Redis
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.core.logging import log_context
 from app.models import (
     Company,
     CompanyMatch,
@@ -68,6 +69,7 @@ from app.services.llm.user_keys import LLMKeyRequiredError, resolve_api_key
 from app.services.matching.filters import hard_filter_conditions
 from app.services.matching.pipeline import load_preferences
 from app.services.prospects.website import WebsiteFetcher
+from app.services.quotas import over_quota
 from app.services.resume import store
 from app.services.resume.files import find_pdf, save_tailored_pdf
 from app.services.resume.skills import get_lexicon
@@ -198,6 +200,10 @@ class DraftPipeline:
     async def run(self, session: AsyncSession, outreach: Outreach, *, actor_id: uuid.UUID | None) -> None:
         """Take one outreach in `drafting` to `pending_review` or `failed`. Raises DraftingPausedError
         (outreach left in `drafting`) when the user's LLM key or quota stops it. Caller commits."""
+        with log_context(user_id=outreach.user_id, outreach_id=outreach.id):
+            await self._run(session, outreach, actor_id=actor_id)
+
+    async def _run(self, session: AsyncSession, outreach: Outreach, *, actor_id: uuid.UUID | None) -> None:
         if outreach.status != OutreachStatus.DRAFTING:
             raise ValueError(f"outreach {outreach.id} is {outreach.status.value}, not drafting")
         user_id = outreach.user_id
@@ -525,6 +531,9 @@ class DraftPipeline:
         if prefs.paused:
             summary.stopped = "paused"
             return summary
+        if await over_quota(session, user_id, self.now()):
+            summary.stopped = "quota_exceeded"
+            return summary
         if await store.get_current(session, user_id) is None:
             summary.stopped = "no_resume"
             return summary
@@ -595,18 +604,19 @@ class DraftPipeline:
                     (await session.scalars(select(User.id).where(User.is_active.is_(True)))).all()
                 )
         for user_id in user_ids:
-            async with sessions() as session:
-                try:
-                    summary = await self.build_for_user(session, user_id)
-                except Exception:  # one user's failure must not stop the others
-                    log.exception("build_daily_drafts failed for user %s", user_id)
-                    total.stopped[str(user_id)] = "error"
-                    continue
-            total.users += 1
-            total.drafted += summary.drafted
-            total.failed += summary.failed
-            if summary.stopped:
-                total.stopped[str(user_id)] = summary.stopped
+            with log_context(user_id=user_id):
+                async with sessions() as session:
+                    try:
+                        summary = await self.build_for_user(session, user_id)
+                    except Exception:  # one user's failure must not stop the others
+                        log.exception("build_daily_drafts failed for user %s", user_id)
+                        total.stopped[str(user_id)] = "error"
+                        continue
+                total.users += 1
+                total.drafted += summary.drafted
+                total.failed += summary.failed
+                if summary.stopped:
+                    total.stopped[str(user_id)] = summary.stopped
         return total
 
 

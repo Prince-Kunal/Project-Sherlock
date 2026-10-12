@@ -17,6 +17,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import Settings
+from app.core.logging import log_context
 from app.models import Company, Job, JobMatch, User, UserPreferences
 from app.models import MasterResume as MasterResumeRow
 from app.models.enums import JobMatchStatus
@@ -36,6 +37,7 @@ from app.services.matching.embed import DEFAULT_MAX_AGE_DAYS, embed_missing_jobs
 from app.services.matching.filters import effective_date, filter_locations, hard_filter_conditions
 from app.services.matching.profile import candidate_payload, profile_text, user_skills
 from app.services.matching.rerank import Reranker, clean_skills, job_ref
+from app.services.quotas import over_quota
 from app.services.resume import store
 from app.services.usage import llm_calls_since, record_llm_usage
 
@@ -108,6 +110,9 @@ class Matcher:
         candidates = await self._candidates(session, user_id, prefs, resume, resume_row.version, now)
         summary.candidates = len(candidates)
         if not candidates:
+            return summary
+        if await over_quota(session, user_id, now):
+            summary.stopped = "quota_exceeded"
             return summary
 
         try:
@@ -229,27 +234,28 @@ class Matcher:
                 )
             ).all()
         for user_id in user_ids:
-            async with sessions() as session:
-                try:
-                    summary = await self.match_user(session, user_id)
-                except Exception:
-                    log.exception("matching failed for user %s", user_id)
-                    run.stopped[str(user_id)] = "error"
-                    continue
-            run.users += 1
-            run.scored += summary.scored
-            run.llm_calls += summary.llm_calls
-            if summary.stopped:
-                run.stopped[str(user_id)] = summary.stopped
-            log.info(
-                "matched user %s: candidates=%d scored=%d unscorable=%d llm_calls=%d stopped=%s",
-                user_id,
-                summary.candidates,
-                summary.scored,
-                summary.unscorable,
-                summary.llm_calls,
-                summary.stopped,
-            )
+            with log_context(user_id=user_id):
+                async with sessions() as session:
+                    try:
+                        summary = await self.match_user(session, user_id)
+                    except Exception:
+                        log.exception("matching failed for user %s", user_id)
+                        run.stopped[str(user_id)] = "error"
+                        continue
+                run.users += 1
+                run.scored += summary.scored
+                run.llm_calls += summary.llm_calls
+                if summary.stopped:
+                    run.stopped[str(user_id)] = summary.stopped
+                log.info(
+                    "matched user %s: candidates=%d scored=%d unscorable=%d llm_calls=%d stopped=%s",
+                    user_id,
+                    summary.candidates,
+                    summary.scored,
+                    summary.unscorable,
+                    summary.llm_calls,
+                    summary.stopped,
+                )
         return run
 
 

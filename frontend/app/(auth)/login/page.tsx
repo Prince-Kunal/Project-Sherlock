@@ -78,7 +78,18 @@ export default function LoginPage() {
 }
 
 function SignInError() {
-  const error = useSearchParams().get("error");
+  const params = useSearchParams();
+  const error = params.get("error");
+  if (params.get("deleted")) {
+    return (
+      <p
+        role="status"
+        className="bg-muted text-foreground rounded-2xl border px-4 py-3 text-sm"
+      >
+        Your data was deleted and Sherlock no longer has access to your Gmail.
+      </p>
+    );
+  }
   if (!error) return null;
   return (
     <p

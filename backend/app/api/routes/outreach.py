@@ -13,6 +13,7 @@ from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import api_error, llm_errors
+from app.api.quota import WithinQuota
 from app.core.auth import CurrentUser
 from app.core.db import get_session
 from app.models import CompanyMatch, Job, JobMatch, Outreach
@@ -193,7 +194,9 @@ async def review_stats(user: CurrentUser, session: Session) -> ReviewStats:
     )
 
 
-@router.post("/build", response_model=BuildQueued, status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/build", response_model=BuildQueued, status_code=status.HTTP_202_ACCEPTED, dependencies=[WithinQuota]
+)
 async def build_now(user: CurrentUser) -> BuildQueued:
     """Run today's draft batch now instead of waiting for 07:00."""
     job_id = await enqueue("build_daily_drafts", str(user.id), job_id=f"build_drafts:{user.id}")
@@ -234,7 +237,7 @@ async def edit_draft(
     return await outreach_detail(session, outreach)
 
 
-@router.post("/{outreach_id}/regenerate", response_model=OutreachDetail)
+@router.post("/{outreach_id}/regenerate", response_model=OutreachDetail, dependencies=[WithinQuota])
 async def regenerate(
     outreach_id: uuid.UUID,
     body: RegenerateIn,
@@ -306,7 +309,7 @@ async def skip(outreach_id: uuid.UUID, user: CurrentUser, session: Session) -> O
     return await outreach_detail(session, outreach)
 
 
-@router.post("/{outreach_id}/retry", response_model=OutreachDetail)
+@router.post("/{outreach_id}/retry", response_model=OutreachDetail, dependencies=[WithinQuota])
 async def retry(
     outreach_id: uuid.UUID, user: CurrentUser, session: Session, llm: LLM, factory: Factory
 ) -> OutreachDetail:
@@ -413,7 +416,7 @@ async def resume_pdf(outreach_id: uuid.UUID, user: CurrentUser, session: Session
     )
 
 
-@router.post("/{outreach_id}/contact", response_model=OutreachDetail)
+@router.post("/{outreach_id}/contact", response_model=OutreachDetail, dependencies=[WithinQuota])
 async def set_contact(
     outreach_id: uuid.UUID, body: ManualContactIn, user: CurrentUser, session: Session, factory: Factory
 ) -> OutreachDetail:

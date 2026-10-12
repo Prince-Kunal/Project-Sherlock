@@ -15,8 +15,9 @@ from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.core.db import get_sessionmaker
-from app.core.logging import configure_logging
+from app.core.logging import configure_logging, log_context
 from app.core.redis import get_redis
+from app.core.sentry import init_sentry
 from app.models import Outreach, User
 from app.models.enums import AtsType, OutreachStatus
 from app.services.email.followups import Followups
@@ -126,6 +127,15 @@ async def build_daily_drafts(ctx: dict[str, Any], user_id: str | None = None) ->
     return run.as_dict()
 
 
+async def first_run(ctx: dict[str, Any], user_id: str) -> dict[str, int]:
+    """The end of onboarding (PLAN.md Phase 9): score jobs for a new user, then build today's drafts
+    right away instead of waiting for the next poll and 07:00."""
+    matched = await match_jobs_for_users(ctx, user_id)
+    drafted = await build_daily_drafts(ctx, user_id)
+    log.info("first_run: user=%s scored=%d drafted=%d", user_id, matched["scored"], drafted["drafted"])
+    return {"scored": matched["scored"], "drafted": drafted["drafted"]}
+
+
 async def discover_prospect_companies(ctx: dict[str, Any], user_id: str | None = None) -> dict[str, int]:
     """Daily (PLAN.md §8): companies for every active prospect target (or just `user_id`'s, from the
     "Find companies" button), their website text, and embeddings; then company matching."""
@@ -181,15 +191,16 @@ async def schedule_and_send(ctx: dict[str, Any]) -> dict[str, int]:
         return totals
     scheduler = Scheduler(get_gmail_factory())
     for user in users:
-        async with get_sessionmaker()() as session:
-            try:
-                summary = await scheduler.run_for_user(session, await session.merge(user))
-            except Exception:  # one user's failure must not stop the others
-                log.exception("schedule_and_send failed for user %s", user.id)
-                continue
-        totals["users"] += 1
-        for key in ("scheduled", "sent", "returned", "waiting"):
-            totals[key] += getattr(summary, key)
+        with log_context(user_id=user.id):
+            async with get_sessionmaker()() as session:
+                try:
+                    summary = await scheduler.run_for_user(session, await session.merge(user))
+                except Exception:  # one user's failure must not stop the others
+                    log.exception("schedule_and_send failed for user %s", user.id)
+                    continue
+            totals["users"] += 1
+            for key in ("scheduled", "sent", "returned", "waiting"):
+                totals[key] += getattr(summary, key)
     log.info("schedule_and_send: %s", totals)
     return totals
 
@@ -202,15 +213,16 @@ async def check_replies(ctx: dict[str, Any]) -> dict[str, int]:
         return totals
     checker = ReplyChecker(get_gmail_factory(), get_llm_client())
     for user in users:
-        async with get_sessionmaker()() as session:
-            try:
-                summary = await checker.run_for_user(session, await session.merge(user))
-            except Exception:
-                log.exception("check_replies failed for user %s", user.id)
-                continue
-        totals["users"] += 1
-        for key in ("checked", "replied", "opted_out", "bounced", "errors"):
-            totals[key] += getattr(summary, key)
+        with log_context(user_id=user.id):
+            async with get_sessionmaker()() as session:
+                try:
+                    summary = await checker.run_for_user(session, await session.merge(user))
+                except Exception:
+                    log.exception("check_replies failed for user %s", user.id)
+                    continue
+            totals["users"] += 1
+            for key in ("checked", "replied", "opted_out", "bounced", "errors"):
+                totals[key] += getattr(summary, key)
     log.info("check_replies: %s", totals)
     return totals
 
@@ -228,22 +240,24 @@ async def create_followups(ctx: dict[str, Any], user_id: str | None = None) -> d
     totals = {"users": 0, "drafted": 0, "failed": 0, "upgraded": 0}
     followups = Followups(get_llm_client())
     for uid in user_ids:
-        async with sessions() as session:
-            try:
-                summary = await followups.run_for_user(session, uid)
-            except Exception:
-                log.exception("create_followups failed for user %s", uid)
-                continue
-        totals["users"] += 1
-        totals["drafted"] += summary.drafted
-        totals["failed"] += summary.failed
-        totals["upgraded"] += summary.upgraded
+        with log_context(user_id=uid):
+            async with sessions() as session:
+                try:
+                    summary = await followups.run_for_user(session, uid)
+                except Exception:
+                    log.exception("create_followups failed for user %s", uid)
+                    continue
+            totals["users"] += 1
+            totals["drafted"] += summary.drafted
+            totals["failed"] += summary.failed
+            totals["upgraded"] += summary.upgraded
     log.info("create_followups: %s", totals)
     return totals
 
 
 async def startup(ctx: dict[str, Any]) -> None:
     configure_logging()
+    init_sentry("worker")
     ctx["http"] = PoliteHttpClient()
     ctx["website_http"] = website_http()
     log.info("worker started")
@@ -267,6 +281,7 @@ class WorkerSettings:
         create_followups,
         func(discover_prospect_companies, keep_result=60, timeout=3600),
         func(match_companies_for_users, keep_result=60),
+        func(first_run, keep_result=60, timeout=3600),
     ]
     cron_jobs: ClassVar[list[CronJob]] = [
         # Every 6h, off the top of the hour. Not at startup: restarts shouldn't hammer job boards.

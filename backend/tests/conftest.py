@@ -17,6 +17,16 @@ os.environ.update(
         "USE_FAKES": "true",
         "GEMINI_API_KEY": "",
         "ALLOW_OWNER_KEY_FALLBACK": "false",
+        # Real credentials in the repo-root .env must never reach a test (invariant 8).
+        "GOOGLE_CLIENT_ID": "",
+        "GOOGLE_CLIENT_SECRET": "",
+        "HUNTER_API_KEY": "",
+        "ANTHROPIC_API_KEY": "",
+        "ADZUNA_APP_ID": "",
+        "ADZUNA_APP_KEY": "",
+        "SENTRY_DSN": "",
+        # The isolation suite fires many requests as one user; test_observability lowers it again.
+        "API_RATE_BURST": "10000",
     }
 )
 

@@ -25,6 +25,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import Settings
+from app.core.logging import log_context
 from app.models import Company, CompanyMatch, Outreach, ProspectTarget, User, UserCompanyBlock
 from app.models.enums import INACTIVE_OUTREACH_STATUSES, CompanyMatchStatus
 from app.schemas.prospects import ScoredCompany, ScoredCompanyLoose
@@ -46,6 +47,7 @@ from app.services.matching.embed import user_embedding
 from app.services.matching.pipeline import daily_window_start, load_preferences
 from app.services.matching.profile import candidate_payload, profile_text
 from app.services.prospects.discovery import active_targets, company_fits
+from app.services.quotas import over_quota
 from app.services.resume import store
 from app.services.usage import llm_calls_since, record_llm_usage
 
@@ -251,6 +253,9 @@ class CompanyMatcher:
         summary.candidates = len(found)
         if not found:
             return summary
+        if await over_quota(session, user_id, now):
+            summary.stopped = "quota_exceeded"
+            return summary
         try:
             api_key = await resolve_api_key(session, user_id)
         except LLMKeyRequiredError:
@@ -313,19 +318,20 @@ class CompanyMatcher:
                 ).all()
             )
         for user_id in user_ids:
-            async with sessions() as session:
-                try:
-                    summary = await self.match_user(session, user_id)
-                except Exception:
-                    log.exception("company matching failed for user %s", user_id)
-                    run.stopped[str(user_id)] = "error"
-                    continue
-            run.users += 1
-            run.scored += summary.scored
-            run.llm_calls += summary.llm_calls
-            if summary.stopped:
-                run.stopped[str(user_id)] = summary.stopped
-            log.info("matched companies for user %s: %s", user_id, summary)
+            with log_context(user_id=user_id):
+                async with sessions() as session:
+                    try:
+                        summary = await self.match_user(session, user_id)
+                    except Exception:
+                        log.exception("company matching failed for user %s", user_id)
+                        run.stopped[str(user_id)] = "error"
+                        continue
+                run.users += 1
+                run.scored += summary.scored
+                run.llm_calls += summary.llm_calls
+                if summary.stopped:
+                    run.stopped[str(user_id)] = summary.stopped
+                log.info("matched companies for user %s: %s", user_id, summary)
         return run
 
 

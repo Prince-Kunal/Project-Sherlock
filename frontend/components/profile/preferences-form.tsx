@@ -18,7 +18,11 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { errorMessage } from "@/lib/api";
 import { usePreferences, useSavePreferences } from "@/lib/queries";
-import type { Preferences } from "@/lib/types";
+import {
+  type Preferences,
+  pickPreferences,
+  SETTINGS_PREFERENCE_KEYS,
+} from "@/lib/types";
 
 function toggle<T>(list: T[], item: T, on: boolean): T[] {
   return on ? [...new Set([...list, item])] : list.filter((x) => x !== item);
@@ -55,6 +59,7 @@ function NumberField({
 }
 
 function PreferencesFields({ initial }: { initial: Preferences }) {
+  const latest = usePreferences().data ?? initial;
   const save = useSavePreferences();
   const [p, setP] = useState(initial);
   const set = (patch: Partial<Preferences>) =>
@@ -65,7 +70,11 @@ function PreferencesFields({ initial }: { initial: Preferences }) {
       className="flex flex-col gap-6"
       onSubmit={(e) => {
         e.preventDefault();
-        save.mutate(p);
+        // Schedule, pause and draft mix are edited in Settings; keep what's saved there.
+        save.mutate({
+          ...p,
+          ...pickPreferences(latest, SETTINGS_PREFERENCE_KEYS),
+        });
       }}
     >
       <div className="grid gap-4 sm:grid-cols-2">
@@ -140,7 +149,7 @@ function PreferencesFields({ initial }: { initial: Preferences }) {
         </Label>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <NumberField
           label="Minimum fit score"
           hint="0–100"
@@ -156,54 +165,6 @@ function PreferencesFields({ initial }: { initial: Preferences }) {
           value={p.max_job_age_days}
           onChange={(max_job_age_days) => set({ max_job_age_days })}
         />
-        <NumberField
-          label="Drafts per day"
-          min={0}
-          max={30}
-          value={p.daily_draft_batch}
-          onChange={(daily_draft_batch) => set({ daily_draft_batch })}
-        />
-        <NumberField
-          label="Daily send cap"
-          hint="Hard maximum 30"
-          min={0}
-          max={30}
-          value={p.daily_send_cap}
-          onChange={(daily_send_cap) => set({ daily_send_cap })}
-        />
-        <NumberField
-          label="Follow up after (days)"
-          min={1}
-          max={30}
-          value={p.followup_after_days}
-          onChange={(followup_after_days) => set({ followup_after_days })}
-        />
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Label className="flex flex-col items-stretch gap-1 font-normal">
-          <span className="text-sm">Send window start</span>
-          <Input
-            type="time"
-            value={p.send_window_start.slice(0, 5)}
-            onChange={(e) => set({ send_window_start: e.target.value })}
-          />
-        </Label>
-        <Label className="flex flex-col items-stretch gap-1 font-normal">
-          <span className="text-sm">Send window end</span>
-          <Input
-            type="time"
-            value={p.send_window_end.slice(0, 5)}
-            onChange={(e) => set({ send_window_end: e.target.value })}
-          />
-        </Label>
-        <Label className="flex flex-col items-stretch gap-1 font-normal">
-          <span className="text-sm">Timezone</span>
-          <Input
-            value={p.timezone}
-            onChange={(e) => set({ timezone: e.target.value })}
-          />
-        </Label>
       </div>
 
       <Label className="flex flex-col items-stretch gap-1 font-normal">
@@ -244,7 +205,8 @@ export function PreferencesForm() {
       <CardHeader>
         <CardTitle>Preferences</CardTitle>
         <CardDescription>
-          What Sherlock looks for, and how much it sends each day.
+          What Sherlock looks for. How much it drafts and sends, and when, is
+          under Settings → Schedule.
         </CardDescription>
       </CardHeader>
       <CardContent>

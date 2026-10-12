@@ -25,6 +25,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import log_context
 from app.models import Contact, Outreach, SuppressionEntry, User
 from app.models.enums import OutreachEventType, OutreachStatus, SuppressionReason, VerificationStatus
 from app.services.email.connection import GmailFactory, mark_needs_reauth
@@ -35,6 +36,7 @@ from app.services.llm.client import LLMClient, LLMError
 from app.services.llm.prompt_loader import load_prompt
 from app.services.llm.redaction import redact_pii
 from app.services.llm.user_keys import LLMKeyRequiredError, resolve_api_key
+from app.services.quotas import over_quota
 from app.services.usage import record_llm_usage
 
 log = logging.getLogger(__name__)
@@ -119,8 +121,8 @@ class ReplyChecker:
         self._llm = llm
 
     async def _tiebreak(self, session: AsyncSession, user_id: uuid.UUID, text: str) -> Kind:
-        if self._llm is None:
-            return "opt_out"
+        if self._llm is None or await over_quota(session, user_id):
+            return "opt_out"  # no LLM to ask (or the user's monthly quota is used up): the safe reading
         try:
             api_key = await resolve_api_key(session, user_id)
             prompt = load_prompt("classify_reply")
@@ -201,26 +203,27 @@ class ReplyChecker:
             summary.stopped = "not_connected"
             return summary
         for outreach in rows:
-            summary.checked += 1
-            try:
-                messages = await gmail.get_thread(outreach.gmail_thread_id)  # type: ignore[arg-type]
-            except GoogleReauthRequiredError:
-                await mark_needs_reauth(session, user.id)
+            with log_context(outreach_id=outreach.id):
+                summary.checked += 1
+                try:
+                    messages = await gmail.get_thread(outreach.gmail_thread_id)  # type: ignore[arg-type]
+                except GoogleReauthRequiredError:
+                    await mark_needs_reauth(session, user.id)
+                    await session.commit()
+                    summary.stopped = "needs_reauth"
+                    break
+                except GmailError as exc:
+                    log.warning("check_replies: thread %s: %s", outreach.gmail_thread_id, exc)
+                    summary.errors += 1
+                    continue
+                found = await self.check_outreach(session, user, outreach, messages)
                 await session.commit()
-                summary.stopped = "needs_reauth"
-                break
-            except GmailError as exc:
-                log.warning("check_replies: thread %s: %s", outreach.gmail_thread_id, exc)
-                summary.errors += 1
-                continue
-            found = await self.check_outreach(session, user, outreach, messages)
-            await session.commit()
-            if found:
-                summary.by_outreach[str(outreach.id)] = found
-                if found == "reply":
-                    summary.replied += 1
-                elif found == "opt_out":
-                    summary.opted_out += 1
-                else:
-                    summary.bounced += 1
+                if found:
+                    summary.by_outreach[str(outreach.id)] = found
+                    if found == "reply":
+                        summary.replied += 1
+                    elif found == "opt_out":
+                        summary.opted_out += 1
+                    else:
+                        summary.bounced += 1
         return summary

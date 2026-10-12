@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.db import get_session
+from app.core.logging import bind_log_context
 from app.models import User
 
 SESSION_COOKIE = "sherlock_session"
@@ -45,7 +46,7 @@ def _unauthorized() -> HTTPException:
     )
 
 
-def _token_from_request(request: Request) -> str | None:
+def token_from_request(request: Request) -> str | None:
     header = request.headers.get("Authorization", "")
     if header.lower().startswith("bearer "):
         return header[7:].strip() or None
@@ -61,12 +62,13 @@ def decode_session_token(token: str) -> uuid.UUID:
 
 
 async def get_current_user(request: Request, session: Annotated[AsyncSession, Depends(get_session)]) -> User:
-    token = _token_from_request(request)
+    token = token_from_request(request)
     if token is None:
         raise _unauthorized()
     user = await session.get(User, decode_session_token(token))
     if user is None or not user.is_active:
         raise _unauthorized()
+    bind_log_context(user_id=user.id)
     return user
 
 

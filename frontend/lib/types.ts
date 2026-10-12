@@ -100,6 +100,28 @@ export type Preferences = {
   timezone: string;
 };
 
+/** Preferences edited in Settings (schedule, pause, draft mix) rather than in Profile. */
+export const SETTINGS_PREFERENCE_KEYS = [
+  "daily_draft_batch",
+  "daily_send_cap",
+  "followup_after_days",
+  "send_window_start",
+  "send_window_end",
+  "timezone",
+  "paused",
+  "open_outreach_share",
+] as const satisfies readonly (keyof Preferences)[];
+
+export function pickPreferences<K extends keyof Preferences>(
+  prefs: Preferences,
+  keys: readonly K[],
+): Pick<Preferences, K> {
+  return Object.fromEntries(keys.map((k) => [k, prefs[k]])) as Pick<
+    Preferences,
+    K
+  >;
+}
+
 export type LLMKeyStatus = {
   configured: boolean;
   provider: string | null;
@@ -397,4 +419,90 @@ export type ApolloKeyStatus = {
   configured: boolean;
   verified_at: string | null;
   searches_this_month: number;
+};
+
+// --- Phase 9: quotas, onboarding, admin (mirrors app/schemas/{settings,onboarding,admin}.py) ---
+
+export type QuotaStatus = {
+  contact_lookups: number;
+  contact_lookups_limit: number;
+  llm_usd: string; // Decimal as a string
+  llm_usd_limit: string;
+  exceeded: ("contact_lookups" | "llm_usd")[];
+  message: string;
+  resets_at: string;
+};
+
+export type OnboardingStatus = {
+  google_sign_in: boolean;
+  gmail: boolean;
+  llm_key: boolean;
+  hunter_key: boolean;
+  resume: boolean;
+  preferences: boolean;
+  completed: boolean;
+  first_run_queued: boolean | null;
+};
+
+export type UserUsage = {
+  user_id: string;
+  email: string;
+  name: string;
+  is_admin: boolean;
+  is_active: boolean;
+  onboarded: boolean;
+  joined_at: string;
+  llm_calls: number;
+  llm_usd: string;
+  contact_lookups: number;
+  contact_verifications: number;
+  est_cost_usd: string;
+  sent: number;
+  quota_exceeded: string[];
+};
+
+export type UsageReport = {
+  month: string; // YYYY-MM
+  since: string;
+  until: string;
+  contact_lookups_limit: number;
+  llm_usd_limit: string;
+  users: UserUsage[];
+  operations: {
+    provider: string;
+    operation: string;
+    units: number;
+    est_cost_usd: string;
+  }[];
+};
+
+export type SuppressionEntry = {
+  email: string;
+  reason: "opt_out" | "bounce" | "manual";
+  created_at: string;
+};
+
+export type SuppressionPage = { items: SuppressionEntry[]; total: number };
+
+export type AtsType = "greenhouse" | "lever" | "ashby" | "none";
+export type SizeHint = "startup" | "mid" | "large" | "unknown";
+
+export type RegistryCompany = {
+  id: string;
+  name: string;
+  domain: string | null;
+  ats_type: AtsType;
+  ats_token: string | null;
+  size_hint: SizeHint;
+  last_polled_at: string | null;
+  active_jobs: number;
+  jobs_on_board: number | null;
+};
+
+export type RegistryCompanyIn = {
+  name: string;
+  domain: string | null;
+  ats_type: AtsType;
+  ats_token: string | null;
+  size_hint: SizeHint;
 };

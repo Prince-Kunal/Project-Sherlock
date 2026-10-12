@@ -10,6 +10,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import api_error
+from app.api.quota import WithinQuota
 from app.api.routes.outreach import run_pipeline
 from app.core.auth import CurrentUser
 from app.core.db import get_session
@@ -208,7 +209,9 @@ async def add_company(body: NewCompanyIn, user: CurrentUser, session: Session) -
     return CompanyBrief.model_validate(company)
 
 
-@router.post("/refresh", response_model=RefreshQueued, status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/refresh", response_model=RefreshQueued, status_code=status.HTTP_202_ACCEPTED, dependencies=[WithinQuota]
+)
 async def refresh(user: CurrentUser) -> RefreshQueued:
     """Find companies for this user's targets and score them now instead of waiting for the night."""
     job_id = await enqueue("discover_prospect_companies", str(user.id), job_id=f"discover:{user.id}")
@@ -347,7 +350,7 @@ async def restore_match(match_id: uuid.UUID, user: CurrentUser, session: Session
     return await _set_status(session, user.id, match_id, "restore")
 
 
-@router.post("/matches/{match_id}/draft", response_model=OutreachDetail)
+@router.post("/matches/{match_id}/draft", response_model=OutreachDetail, dependencies=[WithinQuota])
 async def draft_now(
     match_id: uuid.UUID,
     user: CurrentUser,

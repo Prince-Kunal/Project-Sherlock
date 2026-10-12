@@ -2,35 +2,35 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import api_error, llm_errors
-from app.core.auth import CurrentUser
+from app.core.auth import SESSION_COOKIE, CurrentUser
 from app.core.config import get_settings
 from app.core.db import get_session
 from app.core.redis import get_redis
 from app.models.enums import ServiceKeyType
 from app.schemas.settings import (
     ApolloKeyStatus,
+    DeleteAccountIn,
     GmailStatus,
     HunterKeyIn,
     HunterKeyStatus,
     LLMKeyIn,
     LLMKeyStatus,
+    QuotaOut,
 )
+from app.services.account import delete_user_data
 from app.services.contacts.base import ContactProviderAuthError, ContactProviderError
 from app.services.contacts.keys import get_service_key_row, save_service_key
-from app.services.contacts.service import (
-    APOLLO_SEARCH_OPERATION,
-    ProviderFactory,
-    contact_searches_this_month,
-)
+from app.services.contacts.service import APOLLO_SEARCH_OPERATION, ProviderFactory
 from app.services.email.connection import GmailAccess, get_token_row, gmail_usable, has_gmail_scopes
 from app.services.google.oauth import GoogleOAuth
 from app.services.llm.client import LLMClient
 from app.services.llm.user_keys import FREE_TIER_NOTICE, get_key_row, save_key
 from app.services.matching.pipeline import load_preferences
+from app.services.quotas import contact_lookups_this_month, quota_status
 from app.services.registry import (
     get_apollo_factory,
     get_contact_provider_factory,
@@ -91,7 +91,7 @@ async def _hunter_status(session: AsyncSession, user_id: uuid.UUID) -> HunterKey
         configured=row is not None,
         verified_at=row.verified_at if row else None,
         owner_fallback_allowed=settings.allow_owner_hunter_fallback and bool(settings.hunter_api_key),
-        searches_this_month=await contact_searches_this_month(session, user_id, datetime.now(UTC)),
+        searches_this_month=await contact_lookups_this_month(session, user_id, datetime.now(UTC)),
         monthly_limit=settings.max_contact_lookups_per_user_month,
     )
 
@@ -216,3 +216,40 @@ async def disconnect_gmail(
     elif (row := await get_token_row(session, user.id)) is not None:
         await session.delete(row)
     await session.commit()
+
+
+# --- Quotas and account (PLAN.md Phase 9) -------------------------------------------------------------
+
+
+@router.get("/quota", response_model=QuotaOut)
+async def get_quota(user: CurrentUser, session: Session) -> QuotaOut:
+    status_ = await quota_status(session, user.id)
+    return QuotaOut(
+        contact_lookups=status_.contact_lookups,
+        contact_lookups_limit=status_.contact_lookups_limit,
+        llm_usd=status_.llm_usd,
+        llm_usd_limit=status_.llm_usd_limit,
+        exceeded=status_.exceeded,
+        message=status_.message,
+        resets_at=status_.resets_at,
+    )
+
+
+@router.delete("/account", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_account(
+    body: DeleteAccountIn,
+    user: CurrentUser,
+    session: Session,
+    response: Response,
+    oauth: Annotated[GoogleOAuth | None, Depends(get_google_oauth)],
+) -> None:
+    """Delete my data: every row and file Sherlock holds for this user, and Gmail access revoked.
+    The address must be typed back as confirmation."""
+    if body.confirm_email.strip().lower() != user.email.lower():
+        raise api_error(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "confirm_email_mismatch",
+            "Type your email address exactly.",
+        )
+    await delete_user_data(session, user.id, oauth, get_redis())
+    response.delete_cookie(SESSION_COOKIE)

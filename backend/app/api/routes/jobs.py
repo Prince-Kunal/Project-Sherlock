@@ -6,6 +6,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import api_error, llm_errors
+from app.api.quota import WithinQuota
 from app.core.auth import CurrentUser
 from app.core.db import get_session
 from app.models import Company, Job, UserCompanyBlock, UserPreferences
@@ -70,7 +71,9 @@ async def job_feed(
     )
 
 
-@router.post("/manual", response_model=JobOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/manual", response_model=JobOut, status_code=status.HTTP_201_CREATED, dependencies=[WithinQuota]
+)
 async def add_manual_job(
     body: ManualJobIn,
     user: CurrentUser,

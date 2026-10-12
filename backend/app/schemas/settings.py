@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
@@ -51,3 +52,19 @@ class AllowedEmailOut(BaseModel):
     email: str
     created_at: datetime
     signed_up: bool
+
+
+class QuotaOut(BaseModel):
+    """This month's usage against the per-user limits (PLAN.md Phase 9)."""
+
+    contact_lookups: int
+    contact_lookups_limit: int
+    llm_usd: Decimal
+    llm_usd_limit: Decimal
+    exceeded: list[str]  # "contact_lookups", "llm_usd"
+    message: str  # shown as a notice when something is exceeded
+    resets_at: datetime
+
+
+class DeleteAccountIn(BaseModel):
+    confirm_email: str = Field(max_length=320)  # must equal the signed-in address

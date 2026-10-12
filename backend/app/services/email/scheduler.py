@@ -28,6 +28,7 @@ from sqlalchemy import DateTime, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.logging import log_context
 from app.models import Contact, Outreach, OutreachEvent, SuppressionEntry, User, UserPreferences
 from app.models.enums import EmailSource, OutreachEventType, OutreachStatus
 from app.services.contacts.selector import COOLDOWN_DAYS
@@ -196,15 +197,20 @@ class Scheduler:
             counts[day] = counts.get(day, 0) + 1
         last = max([o.scheduled_at for o in keep if o.scheduled_at] + [now - _gap(self._rng)])
         for outreach in todo:
-            slot = next_slot(max(last, now), window, self._rng, counts, prefs.daily_send_cap)
-            day = slot.astimezone(window.tz).date()
-            counts[day] = counts.get(day, 0) + 1
-            outreach.scheduled_at = slot
-            last = slot
-            if outreach.status == S.APPROVED:
-                await transition(
-                    session, outreach, S.SCHEDULED, actor_id=None, payload={"scheduled_at": slot.isoformat()}
-                )
+            with log_context(outreach_id=outreach.id):
+                slot = next_slot(max(last, now), window, self._rng, counts, prefs.daily_send_cap)
+                day = slot.astimezone(window.tz).date()
+                counts[day] = counts.get(day, 0) + 1
+                outreach.scheduled_at = slot
+                last = slot
+                if outreach.status == S.APPROVED:
+                    await transition(
+                        session,
+                        outreach,
+                        S.SCHEDULED,
+                        actor_id=None,
+                        payload={"scheduled_at": slot.isoformat()},
+                    )
         return len(todo)
 
     async def _return_to_review(

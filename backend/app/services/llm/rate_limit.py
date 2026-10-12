@@ -14,31 +14,11 @@ from zoneinfo import ZoneInfo
 
 from redis.asyncio import Redis
 
+from app.core.rate_limit import BUCKET_LUA
 from app.services.llm.client import LLMQuotaExhaustedError, LLMRateLimitedError
 
 _PACIFIC = ZoneInfo("America/Los_Angeles")
 _DAY_TTL_SECONDS = 36 * 3600
-
-# Returns 0 if a token was taken, otherwise the milliseconds until one is available.
-_BUCKET_LUA = """
-local capacity = tonumber(ARGV[1])
-local refill_per_ms = tonumber(ARGV[2])
-local now = tonumber(ARGV[3])
-local ttl = tonumber(ARGV[4])
-local state = redis.call('HMGET', KEYS[1], 'tokens', 'ts')
-local tokens = tonumber(state[1]) or capacity
-local ts = tonumber(state[2]) or now
-tokens = math.min(capacity, tokens + math.max(0, now - ts) * refill_per_ms)
-local wait = 0
-if tokens >= 1 then
-  tokens = tokens - 1
-else
-  wait = math.ceil((1 - tokens) / refill_per_ms)
-end
-redis.call('HSET', KEYS[1], 'tokens', tostring(tokens), 'ts', tostring(now))
-redis.call('PEXPIRE', KEYS[1], ttl)
-return wait
-"""
 
 
 def key_fingerprint(api_key: str) -> str:
@@ -62,7 +42,7 @@ class RateLimiter:
         self._max_wait = max_wait_seconds
         self._clock = clock
         self._sleep = sleep
-        self._bucket = redis.register_script(_BUCKET_LUA)
+        self._bucket = redis.register_script(BUCKET_LUA)
 
     def _day_key(self, fingerprint: str, model: str) -> str:
         day = datetime.fromtimestamp(self._clock(), _PACIFIC).date().isoformat()

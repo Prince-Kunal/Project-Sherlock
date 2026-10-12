@@ -4,6 +4,7 @@ import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,15 +16,19 @@ from app.services.llm.client import CallMeter, metered
 
 
 async def record_llm_usage(session: AsyncSession, user_id: uuid.UUID, operation: str, calls: int) -> None:
-    """Add a ledger row for `calls` provider requests (nothing for 0, e.g. all cache hits). Caller commits."""
+    """Add a ledger row for `calls` provider requests (nothing for 0, e.g. all cache hits). Caller commits.
+    The cost is an estimate per request (`LLM_USD_PER_CALL`, 0 on Gemini's free tier); it feeds the
+    `MAX_LLM_USD_PER_USER_MONTH` quota and the admin page."""
     if calls <= 0:
         return
+    settings = get_settings()
     session.add(
         UsageLedger(
             user_id=user_id,
-            provider=UsageProvider(get_settings().llm_provider),
+            provider=UsageProvider(settings.llm_provider),
             operation=operation,
             units=calls,
+            est_cost_usd=Decimal(str(settings.llm_usd_per_call)) * calls,
         )
     )
 

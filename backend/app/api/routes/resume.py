@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import api_error, llm_errors
+from app.api.quota import WithinQuota
 from app.core.auth import CurrentUser
 from app.core.config import get_settings
 from app.core.db import get_session
@@ -56,7 +57,9 @@ def _save_upload(user_id: uuid.UUID, suffix: str, data: bytes) -> str:
     return str(path)
 
 
-@router.post("/upload", response_model=ResumeOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/upload", response_model=ResumeOut, status_code=status.HTTP_201_CREATED, dependencies=[WithinQuota]
+)
 async def upload_resume(
     user: CurrentUser, session: Session, llm: LLM, file: Annotated[UploadFile, File()]
 ) -> ResumeOut:
@@ -151,7 +154,7 @@ class TagSkillsIn(BaseModel):
     texts: list[str] = Field(min_length=1, max_length=40)
 
 
-@router.post("/tag-skills", response_model=list[TaggedBullet])
+@router.post("/tag-skills", response_model=list[TaggedBullet], dependencies=[WithinQuota])
 async def tag_skills(body: TagSkillsIn, user: CurrentUser, session: Session, llm: LLM) -> list[TaggedBullet]:
     """Suggest skill tags for new or edited bullets (one LLM request for the whole batch)."""
     current = await store.get_current(session, user.id)

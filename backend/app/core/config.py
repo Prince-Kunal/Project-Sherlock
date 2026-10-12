@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -74,8 +74,26 @@ class Settings(BaseSettings):
     max_contact_lookups_per_user_month: int = 40
     contact_cache_days: int = 60
     max_llm_usd_per_user_month: float = 5.0
+    # Estimated cost of one LLM request, logged to usage_ledger. 0 on Gemini's free tier; set it when a
+    # paid model or provider is used so MAX_LLM_USD_PER_USER_MONTH means something.
+    llm_usd_per_call: float = 0.0
 
+    # API rate limit (PLAN.md Phase 9): a Redis token bucket per signed-in user (per IP otherwise).
+    api_rate_limit_enabled: bool = True
+    api_rate_per_minute: int = 120
+    api_rate_burst: int = 60
+
+    log_json: bool = False  # JSON lines (one object per record); on by default in production
     sentry_dsn: str = ""
+
+    @field_validator("*", mode="before")
+    @classmethod
+    def _comment_only_is_unset(cls, value: object) -> object:
+        """`KEY=   # note` reaches the app as "# note" through docker compose's env_file (pydantic's
+        own .env reader strips it). A value that is only a comment means the key is unset."""
+        if isinstance(value, str) and value.strip().startswith("#"):
+            return ""
+        return value
 
     @model_validator(mode="after")
     def _check_production_safety(self) -> "Settings":

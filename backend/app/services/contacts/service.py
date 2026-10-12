@@ -36,14 +36,13 @@ from app.services.contacts.finder import ACCEPTED, ContactFinder, FinderUsage, N
 from app.services.contacts.keys import resolve_apollo_key, resolve_hunter_key
 from app.services.contacts.selector import COOLDOWN_DAYS, categorize
 from app.services.email.state import record_event, transition
+from app.services.quotas import contact_lookups_this_month
 
 ProviderFactory = Callable[[str], ContactProvider]
 
 SEARCH_OPERATION = "hunter_search"
 VERIFY_OPERATION = "hunter_verify"
 APOLLO_SEARCH_OPERATION = "apollo_search"
-# Every provider's people searches count toward MAX_CONTACT_LOOKUPS_PER_USER_MONTH.
-LOOKUP_OPERATIONS = (SEARCH_OPERATION, APOLLO_SEARCH_OPERATION)
 
 
 class OutreachConflictError(Exception):
@@ -54,21 +53,6 @@ class ManualContactError(Exception):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
         self.code = code
-
-
-def month_start(now: datetime) -> datetime:
-    return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-
-async def contact_searches_this_month(session: AsyncSession, user_id: uuid.UUID, now: datetime) -> int:
-    total = await session.scalar(
-        select(func.coalesce(func.sum(UsageLedger.units), 0)).where(
-            UsageLedger.user_id == user_id,
-            UsageLedger.operation.in_(LOOKUP_OPERATIONS),
-            UsageLedger.created_at >= month_start(now),
-        )
-    )
-    return int(total or 0)
 
 
 async def build_finder(
@@ -82,7 +66,7 @@ async def build_finder(
     settings = get_settings()
     key = await resolve_hunter_key(session, user_id)
     apollo_key = await resolve_apollo_key(session, user_id) if apollo_factory else None
-    used = await contact_searches_this_month(session, user_id, now)
+    used = await contact_lookups_this_month(session, user_id, now)
     return ContactFinder(
         factory(key) if key else None,
         now=now,

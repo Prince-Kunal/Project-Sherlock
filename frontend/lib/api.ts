@@ -69,6 +69,8 @@ export type User = {
   name: string;
   is_admin: boolean;
   timezone: string;
+  onboarded_at: string | null;
+  onboarded: boolean; // finished (or skipped) /welcome
 };
 
 export type Session = { token: string; user: User };

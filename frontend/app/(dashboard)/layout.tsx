@@ -21,14 +21,24 @@ const TABS = [
   { href: "/profile", label: "Profile" },
   { href: "/settings", label: "Settings" },
 ] as const;
+const ADMIN_TAB = { href: "/admin", label: "Admin" } as const;
 
-function Nav({ id, className }: { id: string; className?: string }) {
+function Nav({
+  id,
+  className,
+  isAdmin,
+}: {
+  id: string;
+  className?: string;
+  isAdmin: boolean;
+}) {
   const pathname = usePathname();
   const reduce = useReducedMotion();
+  const tabs = isAdmin ? [...TABS, ADMIN_TAB] : TABS;
   return (
     <nav aria-label="Sections" className={className}>
       <ul className="bg-muted/70 ring-foreground/[0.06] flex w-max items-center gap-0.5 rounded-full p-1 ring-1 ring-inset">
-        {TABS.map((tab) => {
+        {tabs.map((tab) => {
           const active = pathname.startsWith(tab.href);
           return (
             <li key={tab.href} className="relative">
@@ -74,11 +84,14 @@ export default function DashboardLayout({
   const unauthenticated =
     me.error instanceof ApiError && me.error.status === 401;
 
+  const needsOnboarding = me.data !== undefined && !me.data.onboarded;
+
   useEffect(() => {
     if (unauthenticated) router.replace("/login");
-  }, [unauthenticated, router]);
+    else if (needsOnboarding) router.replace("/welcome");
+  }, [unauthenticated, needsOnboarding, router]);
 
-  if (me.isPending || unauthenticated) {
+  if (me.isPending || unauthenticated || needsOnboarding) {
     return (
       <div
         role="status"
@@ -116,11 +129,15 @@ export default function DashboardLayout({
           >
             <Wordmark />
           </Link>
-          <Nav id="wide" className="hidden lg:block" />
+          <Nav
+            id="wide"
+            className="hidden lg:block"
+            isAdmin={me.data.is_admin}
+          />
           <UserMenu user={me.data} />
         </div>
         <div className="[scrollbar-width:none] overflow-x-auto px-4 pb-3 lg:hidden">
-          <Nav id="narrow" />
+          <Nav id="narrow" isAdmin={me.data.is_admin} />
         </div>
       </header>
       <StatusBanner />

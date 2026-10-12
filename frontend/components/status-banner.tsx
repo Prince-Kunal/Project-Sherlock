@@ -1,14 +1,16 @@
 "use client";
 
-import { AlertTriangle, PauseCircle } from "lucide-react";
+import { AlertTriangle, Gauge, PauseCircle } from "lucide-react";
 import Link from "next/link";
 
 import { googleSignInUrl } from "@/lib/auth";
-import { useGmailStatus } from "@/lib/queries";
+import { useGmailStatus, useQuota } from "@/lib/queries";
 
-/** Shown on every page when sending can't happen: Gmail needs reconnecting, or the user paused. */
+/** Shown on every page when sending can't happen (Gmail needs reconnecting, or the user paused) or
+ * when this month's quota is used up. */
 export function StatusBanner() {
   const gmail = useGmailStatus();
+  const quota = useQuota();
   const status = gmail.data;
   if (!status) return null;
 
@@ -54,6 +56,14 @@ export function StatusBanner() {
           <p className="mx-auto flex max-w-6xl items-start gap-2 px-4 py-2 text-sm">
             <AlertTriangle className="mt-0.5 size-4 shrink-0" />
             <span>{message}</span>
+          </p>
+        </div>
+      )}
+      {quota.data?.message && (
+        <div className="border-b border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+          <p className="mx-auto flex max-w-6xl items-start gap-2 px-4 py-2 text-sm">
+            <Gauge className="mt-0.5 size-4 shrink-0" />
+            <span>{quota.data.message}</span>
           </p>
         </div>
       )}

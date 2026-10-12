@@ -21,6 +21,7 @@ from pydantic import BaseModel
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import log_context
 from app.models import Company, Contact, Job, JobMatch, Outreach, OutreachEvent
 from app.models.enums import CampaignType, JobMatchStatus, OutreachEventType, OutreachStatus
 from app.schemas.outreach import DraftIssue, EmailDraft
@@ -42,6 +43,7 @@ from app.services.llm.redaction import redact_pii
 from app.services.llm.user_keys import LLMKeyRequiredError, resolve_api_key
 from app.services.matching.filters import hard_filter_conditions
 from app.services.matching.pipeline import load_preferences
+from app.services.quotas import over_quota
 from app.services.resume import store
 from app.services.usage import record_llm_usage
 
@@ -151,6 +153,9 @@ class Followups:
         if prefs.paused:
             summary.stopped = "paused"
             return summary
+        if await over_quota(session, user_id, now):
+            summary.stopped = "quota_exceeded"
+            return summary
         summary.upgraded = await self.upgrade_open_outreach(session, user_id, now)
         due_before = now - timedelta(days=prefs.followup_after_days)
         rows = (
@@ -171,45 +176,46 @@ class Followups:
         resume_row = await store.get_current(session, user_id)
         basics = MasterResume.model_validate(resume_row.data).basics if resume_row else Basics(name="")
         for outreach in rows:
-            if outreach.status == S.SENT:
-                await transition(session, outreach, S.FOLLOWUP_DUE, actor_id=None, payload={"due": True})
+            with log_context(outreach_id=outreach.id):
+                if outreach.status == S.SENT:
+                    await transition(session, outreach, S.FOLLOWUP_DUE, actor_id=None, payload={"due": True})
+                    await session.commit()
+                contact = await session.get(Contact, outreach.contact_id) if outreach.contact_id else None
+                if contact is None:
+                    continue
+                job = await session.get(Job, outreach.job_id) if outreach.job_id else None
+                company = await session.get(Company, outreach.company_id)
+                upgraded = await _was_upgraded(session, outreach)
+                with metered() as meter:
+                    try:
+                        api_key = await resolve_api_key(session, user_id)
+                        subject, body = await self._drafter.draft(
+                            outreach, contact, basics, job.title if job else None,
+                            company.name if company else "", now, api_key,
+                            open_outreach=outreach.campaign_type == CampaignType.OPEN or upgraded,
+                            new_opening=job.title if upgraded and job else None,
+                        )  # fmt: skip
+                    except _PAUSING as exc:
+                        summary.stopped = type(exc).__name__
+                        await record_llm_usage(session, user_id, OPERATION, meter.calls)
+                        await session.commit()
+                        break
+                    except LLMOutputError as exc:
+                        log.info("follow-up for %s not drafted: %s", outreach.id, exc)
+                        summary.failed += 1
+                        await record_llm_usage(session, user_id, OPERATION, meter.calls)
+                        await session.commit()
+                        continue  # stays followup_due; the user can still close it from the tracker
+                    await record_llm_usage(session, user_id, OPERATION, meter.calls)
+                original = {"subject": outreach.subject, "body": outreach.body}
+                outreach.subject, outreach.body = subject, body
+                outreach.followup_count = 1
+                await transition(
+                    session, outreach, S.PENDING_REVIEW, actor_id=None,
+                    event=OutreachEventType.FOLLOWUP_DRAFTED, payload={"original": original},
+                )  # fmt: skip
                 await session.commit()
-            contact = await session.get(Contact, outreach.contact_id) if outreach.contact_id else None
-            if contact is None:
-                continue
-            job = await session.get(Job, outreach.job_id) if outreach.job_id else None
-            company = await session.get(Company, outreach.company_id)
-            upgraded = await _was_upgraded(session, outreach)
-            with metered() as meter:
-                try:
-                    api_key = await resolve_api_key(session, user_id)
-                    subject, body = await self._drafter.draft(
-                        outreach, contact, basics, job.title if job else None,
-                        company.name if company else "", now, api_key,
-                        open_outreach=outreach.campaign_type == CampaignType.OPEN or upgraded,
-                        new_opening=job.title if upgraded and job else None,
-                    )  # fmt: skip
-                except _PAUSING as exc:
-                    summary.stopped = type(exc).__name__
-                    await record_llm_usage(session, user_id, OPERATION, meter.calls)
-                    await session.commit()
-                    break
-                except LLMOutputError as exc:
-                    log.info("follow-up for %s not drafted: %s", outreach.id, exc)
-                    summary.failed += 1
-                    await record_llm_usage(session, user_id, OPERATION, meter.calls)
-                    await session.commit()
-                    continue  # stays followup_due; the user can still close it from the tracker
-                await record_llm_usage(session, user_id, OPERATION, meter.calls)
-            original = {"subject": outreach.subject, "body": outreach.body}
-            outreach.subject, outreach.body = subject, body
-            outreach.followup_count = 1
-            await transition(
-                session, outreach, S.PENDING_REVIEW, actor_id=None, event=OutreachEventType.FOLLOWUP_DRAFTED,
-                payload={"original": original},
-            )  # fmt: skip
-            await session.commit()
-            summary.drafted += 1
+                summary.drafted += 1
         return summary
 
     async def upgrade_open_outreach(self, session: AsyncSession, user_id: uuid.UUID, now: datetime) -> int:

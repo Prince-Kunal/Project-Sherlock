@@ -81,3 +81,24 @@ committing, then run `make test`.
 
 Delete the test emails if you like. To revoke Sherlock's access: Settings → Sending →
 **Disconnect** (or <https://myaccount.google.com/permissions>).
+
+## Phase 9: a second user onboards end to end (after deployment)
+
+The Phase 9 acceptance criterion "a second test user can go through onboarding end to end on the
+deployed instance" waits for the deployment task. The same flow was run on fakes (API level, local
+host, 2026-10-12). On the deployed instance:
+
+1. As the owner, open **Admin → People** and add the friend's Gmail address. In the Google Cloud
+   console, add the same address under **Audience → Test users** (Testing mode refuses others).
+2. In a private window, sign in as the friend. Expected: Sherlock opens **/welcome**, not the review
+   queue, and the stepper starts at **Connect Gmail** only if the Gmail boxes were unticked.
+3. Add the friend's own Gemini key, then their Hunter key (or skip it and see the warning).
+4. Upload their resume, check what was read, fix anything and save, then **Looks right**.
+5. Set at least one target role and employment type, save, **Continue**, **Start the first run**.
+   Expected: the review queue opens; within a few minutes drafts appear (as many as the jobs that
+   fit allow, up to the daily batch).
+6. As the owner, **Admin → Usage**: the friend's row shows LLM requests and contact lookups, and
+   "setting up" is gone.
+7. As the friend, **Settings → Delete my data**, type the address. Expected: back on the login page
+   with the "Your data was deleted" note; the friend is gone from Admin → Usage; at
+   <https://myaccount.google.com/permissions> Sherlock no longer has access.
