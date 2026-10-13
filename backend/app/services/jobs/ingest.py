@@ -85,7 +85,11 @@ async def upsert_jobs(
             "location": excluded.location,
             "remote": func.coalesce(excluded.remote, Job.remote),
             "employment_type": func.coalesce(excluded.employment_type, Job.employment_type),
-            "description_text": excluded.description_text,
+            # A source may send no description for a job it already gave one for (SmartRecruiters only
+            # fetches details for new postings): keep the stored text then.
+            "description_text": func.coalesce(
+                func.nullif(excluded.description_text, ""), Job.description_text
+            ),
             "url": func.coalesce(excluded.url, Job.url),
             # Keep the earliest known posting date.
             "posted_at": func.coalesce(func.least(Job.posted_at, excluded.posted_at), excluded.posted_at),

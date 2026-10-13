@@ -19,6 +19,9 @@ class AtsType(StrEnum):
     GREENHOUSE = "greenhouse"
     LEVER = "lever"
     ASHBY = "ashby"
+    SMARTRECRUITERS = "smartrecruiters"
+    WORKABLE = "workable"
+    RECRUITEE = "recruitee"
     NONE = "none"
 
 
@@ -43,6 +46,40 @@ class JobSourceType(StrEnum):
     ADZUNA = "adzuna"
     HN = "hn"
     MANUAL = "manual"
+    SMARTRECRUITERS = "smartrecruiters"
+    WORKABLE = "workable"
+    RECRUITEE = "recruitee"
+    REMOTIVE = "remotive"
+
+
+class JobFeed(StrEnum):
+    """What a user can switch on or off as a source of matches (`user_preferences.job_sources`).
+    Manual jobs are always included."""
+
+    BOARDS = "boards"  # every company career board: Greenhouse, Lever, Ashby, SmartRecruiters, ...
+    ADZUNA = "adzuna"
+    HN = "hn"
+    REMOTIVE = "remotive"
+
+
+BOARD_SOURCES = (
+    JobSourceType.GREENHOUSE,
+    JobSourceType.LEVER,
+    JobSourceType.ASHBY,
+    JobSourceType.SMARTRECRUITERS,
+    JobSourceType.WORKABLE,
+    JobSourceType.RECRUITEE,
+)
+
+
+def sources_for(feeds: list[str]) -> list[JobSourceType]:
+    """The job sources behind a user's chosen feeds, plus manual jobs (always theirs to see)."""
+    chosen = set(feeds)
+    out = [JobSourceType.MANUAL]
+    if JobFeed.BOARDS in chosen:
+        out += BOARD_SOURCES
+    out += [JobSourceType(f) for f in (JobFeed.ADZUNA, JobFeed.HN, JobFeed.REMOTIVE) if f in chosen]
+    return out
 
 
 class JobMatchStatus(StrEnum):

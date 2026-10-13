@@ -249,6 +249,7 @@ class Followups:
                             max_job_age_days=prefs.max_job_age_days,
                             employment_types=list(prefs.employment_types),
                             company_stages=list(prefs.company_stages),
+                            job_sources=list(prefs.job_sources),
                             now=now,
                         ),
                     )

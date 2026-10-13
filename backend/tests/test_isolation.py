@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Company, User
 from app.models.enums import SizeHint
+from app.services.connections import ParsedConnection, replace_connections
 from tests.prospect_fixtures import TARGET_NAME, add_company_match, add_target
 from tests.sending_fixtures import sendable
 from tests.test_matches_api import scored_user
@@ -40,6 +41,7 @@ ID_ROUTES: list[tuple[str, str, dict[str, Any] | None]] = [
     ("POST", "/outreach/{outreach}/close", None),
     ("GET", "/outreach/{outreach}/timeline", None),
     ("GET", "/outreach/{outreach}/resume.pdf", None),
+    ("GET", "/outreach/{outreach}/resume.docx", None),
     ("POST", "/outreach/{outreach}/contact", {"email": "someone@elsewhere.example"}),
     ("PUT", "/prospects/targets/{target}", {"name": "B's now"}),
     ("DELETE", "/prospects/targets/{target}", None),
@@ -56,6 +58,7 @@ LIST_ROUTES = [
     "/resume",
     "/resume/versions",
     "/resume/preview.pdf",
+    "/resume/preview.docx",
     "/resume/ats-check",
     "/preferences",
     "/settings/llm-key",
@@ -69,10 +72,12 @@ LIST_ROUTES = [
     "/outreach",
     "/outreach?status=pending_review",
     "/outreach/stats",
+    "/outreach/analytics",
     "/prospects/targets",
     "/prospects/options",
     "/prospects/companies/search?q=Company",
     "/prospects/matches",
+    "/connections",
 ]
 
 # Writes without ids: they can only act on the caller's own rows (the user comes from the session).
@@ -97,6 +102,8 @@ SELF_SCOPED = {
     ("POST", "/prospects/companies"),
     ("POST", "/prospects/refresh"),
     ("POST", "/onboarding/complete"),
+    ("POST", "/connections"),
+    ("DELETE", "/connections"),
 }
 
 # Shared, not user data: companies are one registry; a block is the caller's own row (checked below).
@@ -151,6 +158,9 @@ async def user_a(auth_client: AsyncClient, session: AsyncSession) -> dict[str, A
     session.add(company)
     await session.commit()
     cmatch = await add_company_match(session, me, company, target)
+    await replace_connections(
+        session, me, [ParsedConnection(full_name="Zed Marker", company="Isolation Labs", position="CTO")]
+    )
     await session.commit()
     matches = (await auth_client.get("/matches", params={"min_score": 0})).json()["items"]
     assert (await auth_client.post(f"/companies/{company.id}/block")).status_code == 200
@@ -214,6 +224,7 @@ async def test_another_users_lists_never_show_my_data(
         "dev@sherlock.local",
         "rohan@example.com",  # A's resume
         TARGET_NAME,
+        "Zed Marker",  # A's connection
     ]
     leaks = []
     for path in LIST_ROUTES:

@@ -98,7 +98,13 @@ export type Preferences = {
   paused: boolean;
   about_me: string;
   timezone: string;
+  job_sources: SourceFeed[];
+  weekly_summary: boolean;
+  draft_style: "ab" | "a" | "b";
 };
+
+/** Where a user's matches come from (Phase 10). Manual jobs always count. */
+export type SourceFeed = "boards" | "adzuna" | "hn" | "remotive";
 
 /** Preferences edited in Settings (schedule, pause, draft mix) rather than in Profile. */
 export const SETTINGS_PREFERENCE_KEYS = [
@@ -110,6 +116,9 @@ export const SETTINGS_PREFERENCE_KEYS = [
   "timezone",
   "paused",
   "open_outreach_share",
+  "job_sources",
+  "weekly_summary",
+  "draft_style",
 ] as const satisfies readonly (keyof Preferences)[];
 
 export function pickPreferences<K extends keyof Preferences>(
@@ -141,7 +150,17 @@ export type Job = {
   remote: boolean | null;
   employment_type: EmploymentType | null;
   url: string | null;
-  source: "greenhouse" | "lever" | "ashby" | "adzuna" | "hn" | "manual";
+  source:
+    | "greenhouse"
+    | "lever"
+    | "ashby"
+    | "smartrecruiters"
+    | "workable"
+    | "recruitee"
+    | "adzuna"
+    | "hn"
+    | "remotive"
+    | "manual";
   posted_at: string | null;
   first_seen_at: string;
   effective_date: string;
@@ -176,6 +195,7 @@ export type Contact = {
 
 export type Outreach = {
   id: string;
+  draft_variant: "a" | "b" | null; // A/B email style (Phase 10)
   status: string;
   campaign_type: "job" | "open";
   job_id: string | null;
@@ -205,6 +225,7 @@ export type Match = {
   status: MatchStatus;
   created_at: string;
   outreach: Outreach | null;
+  warm_path: WarmPath | null;
 };
 
 export type MatchFeed = {
@@ -278,6 +299,8 @@ export type OutreachList = { items: OutreachListItem[]; total: number };
 
 /** Everything the review card shows (mirrors backend OutreachDetail). */
 export type OutreachDetail = OutreachListItem & {
+  warm_path: WarmPath | null;
+  knows_contact: boolean;
   body: string | null;
   personalization_source: string | null;
   match_id: string | null;
@@ -393,6 +416,7 @@ export type CompanyMatch = {
   status: CompanyMatchStatus;
   created_at: string;
   outreach: Outreach | null;
+  warm_path: WarmPath | null;
 };
 
 export type CompanyMatchFeed = {
@@ -484,7 +508,14 @@ export type SuppressionEntry = {
 
 export type SuppressionPage = { items: SuppressionEntry[]; total: number };
 
-export type AtsType = "greenhouse" | "lever" | "ashby" | "none";
+export type AtsType =
+  | "greenhouse"
+  | "lever"
+  | "ashby"
+  | "smartrecruiters"
+  | "workable"
+  | "recruitee"
+  | "none";
 export type SizeHint = "startup" | "mid" | "large" | "unknown";
 
 export type RegistryCompany = {
@@ -505,4 +536,55 @@ export type RegistryCompanyIn = {
   ats_type: AtsType;
   ats_token: string | null;
   size_hint: SizeHint;
+};
+
+// --- Phase 10: warm paths, analytics ---
+
+export type WarmPath = {
+  count: number;
+  alumni: number;
+  people: {
+    name: string;
+    position: string;
+    alumni: boolean;
+    profile_url: string | null;
+  }[];
+};
+
+export type ConnectionsSummary = {
+  count: number;
+  companies: number;
+  alumni: number;
+  uploaded_at: string | null;
+};
+
+export type AnalyticsBucket = {
+  key: string;
+  label: string;
+  sent: number;
+  replied: number;
+  reply_rate: number | null;
+  referred: number;
+  interview: number;
+};
+
+export type OutreachAnalytics = {
+  since: string | null;
+  sent: number;
+  replied: number;
+  reply_rate: number | null;
+  referred: number;
+  interview: number;
+  by_role: AnalyticsBucket[];
+  by_stage: AnalyticsBucket[];
+  by_variant: AnalyticsBucket[];
+  by_mode: AnalyticsBucket[];
+  leader: "a" | "b" | null;
+  verdict: string;
+  draft_style: "ab" | "a" | "b";
+};
+
+export const STYLE_NAMES: Record<"a" | "b", string> = {
+  a: "Ask first",
+  b: "Work first",
 };

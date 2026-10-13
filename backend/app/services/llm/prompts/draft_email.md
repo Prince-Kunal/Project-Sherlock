@@ -1,5 +1,5 @@
 ---
-version: 3
+version: 4
 ---
 # Task: write the middle of a short email asking someone for a referral
 
@@ -12,9 +12,10 @@ rule below is broken.
 
 ## Input
 - `inputs.job`: the job title, company and location.
-- `inputs.context_sentences`: sentences from the job posting (and sometimes the company's own
-  description). Use the one closest to the candidate's work to decide which of their work to
-  mention.
+- `inputs.context_sentences`: sentences from the job posting, and sometimes from the company's own
+  description, website or latest blog post. Use the one closest to the candidate's work to decide
+  which of their work to mention. Sentences from the company's site or blog steer the choice the
+  same way; never say the candidate read them (Sherlock did, not the candidate).
 - `inputs.recipient`: the person's title, their role category and how to pitch it to them.
 - `inputs.about_me`: a line or two the candidate wrote about themselves.
 - `inputs.highlights`: the candidate's two most relevant resume bullets for this job.
@@ -44,8 +45,8 @@ rule below is broken.
   what their own job post says.
 - They don't explain why they fit ("this seemed relevant", "this matches what I do", "which
   connects to your work"). They say what they did and let the reader connect it.
-- No two emails have the same shape. Sometimes the ask comes first, sometimes one line of what
-  they've built does; sometimes it's one paragraph, sometimes two.
+- They follow the shape given under "Shape of this email" below, in their own words. Two emails
+  with the same shape still never share sentences.
 - They describe their own work casually and specifically: "I built a parser and put it behind a
   REST API" rather than "Exposed the parser as a REST API, CLI and web visualiser".
 - They don't perform enthusiasm or flatter. One plain sentence of genuine interest at most.
@@ -104,6 +105,9 @@ excited to see that Ledgerline is looking to build REST APIs in Python. As a pas
 science student, I have honed my skills in backend development, which aligns perfectly with your
 team's needs. I would love the opportunity to contribute to your innovative team. Thank you for
 your time and consideration."
+
+## Shape of this email
+{{style}}
 
 ## Inputs
 ```json

@@ -8,6 +8,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from app.models.enums import CompanyMatchStatus
+from app.schemas.connections import WarmPathOut
 from app.schemas.jobs import CompanyBrief
 from app.schemas.outreach import OutreachOut
 
@@ -88,6 +89,7 @@ class CompanyMatchOut(BaseModel):
     status: CompanyMatchStatus
     created_at: datetime
     outreach: OutreachOut | None = None  # the latest outreach to this company, if any
+    warm_path: WarmPathOut | None = None  # people the user knows there (Phase 10)
 
 
 class CompanyMatchFeed(BaseModel):

@@ -17,6 +17,9 @@ class CompanyRef(BaseModel):
     domain: str | None = None
     ats_type: AtsType
     ats_token: str | None = None
+    # External ids of this board's jobs already stored with a description (SmartRecruiters uses it to
+    # skip detail requests).
+    known_ids: frozenset[str] = frozenset()
 
 
 class JobQuery(BaseModel):

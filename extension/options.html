@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Send to Sherlock: options</title>
+    <style>
+      body { font: 14px system-ui, sans-serif; margin: 16px; min-width: 320px; color: #1c1917; }
+      label { display: block; margin-bottom: 6px; font-weight: 600; }
+      input { width: 100%; box-sizing: border-box; padding: 6px 8px; font: inherit; }
+      p { color: #57534e; }
+      button { margin-top: 10px; padding: 6px 14px; font: inherit; }
+      #status { margin-left: 8px; }
+      @media (prefers-color-scheme: dark) {
+        body { background: #1c1917; color: #f5f5f4; }
+        p { color: #a8a29e; }
+      }
+    </style>
+  </head>
+  <body>
+    <label for="base">Your Sherlock address</label>
+    <input id="base" type="url" placeholder="http://localhost:3000" />
+    <p>Where your Sherlock runs, e.g. http://localhost:3000 or your own domain. Sign in there once in this browser.</p>
+    <button id="save" type="button">Save</button><span id="status"></span>
+    <script src="options.js"></script>
+  </body>
+</html>

@@ -13,7 +13,7 @@ from typing import Any
 from sqlalchemy import ColumnElement, func, or_, select
 
 from app.models import Company, Job, UserCompanyBlock
-from app.models.enums import SizeHint
+from app.models.enums import SizeHint, sources_for
 from app.services.sources.text import normalize_key
 
 effective_date = func.coalesce(Job.posted_at, Job.first_seen_at)
@@ -32,9 +32,11 @@ def hard_filter_conditions(
     employment_types: list[str],
     company_stages: list[str],
     now: datetime,
+    job_sources: list[str] | None = None,
 ) -> list[ColumnElement[bool]]:
     """Jobs a user could be shown at all. Unknown values (no employment type, unknown company size)
-    pass: the LLM decides the employment type during scoring."""
+    pass: the LLM decides the employment type during scoring. `job_sources` are the user's chosen
+    feeds (JobFeed values); None means every source. Manual jobs always pass."""
     blocked = select(UserCompanyBlock.company_id).where(UserCompanyBlock.user_id == user_id)
     conditions: list[ColumnElement[bool]] = [
         Job.is_active.is_(True),
@@ -50,6 +52,8 @@ def hard_filter_conditions(
                     Job.employment_type.is_not(None), ~Job.title.regexp_match(SENIOR_TITLE_PATTERN, flags="i")
                 )
             )
+    if job_sources is not None:
+        conditions.append(Job.source.in_(sources_for(job_sources)))
     if company_stages:
         sized = select(Company.id).where(Company.size_hint.in_([*company_stages, SizeHint.UNKNOWN.value]))
         conditions.append(Job.company_id.in_(sized))

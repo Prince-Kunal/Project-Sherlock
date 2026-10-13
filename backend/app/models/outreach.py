@@ -33,6 +33,7 @@ class Outreach(UserOwnedBase):
         ),
         CheckConstraint("campaign_type <> 'job' OR job_id IS NOT NULL", name="job_campaign_has_job"),
         CheckConstraint("followup_count BETWEEN 0 AND 1", name="followup_count_max_one"),
+        CheckConstraint("draft_variant IN ('a', 'b')", name="draft_variant_values"),
     )
 
     campaign_type: Mapped[CampaignType] = mapped_column(str_enum(CampaignType, "campaign_type"))
@@ -63,6 +64,7 @@ class Outreach(UserOwnedBase):
     outcome: Mapped[Outcome] = mapped_column(str_enum(Outcome, "outcome"), server_default=Outcome.NONE.value)
     notes: Mapped[str] = mapped_column(Text, server_default="")
     failure_reason: Mapped[str | None] = mapped_column(Text)
+    draft_variant: Mapped[str | None] = mapped_column(String(8))  # A/B draft style, 'a' or 'b'
 
 
 class OutreachEvent(UserOwnedBase):

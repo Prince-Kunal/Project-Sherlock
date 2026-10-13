@@ -19,11 +19,12 @@ from app.core.logging import configure_logging, log_context
 from app.core.redis import get_redis
 from app.core.sentry import init_sentry
 from app.models import Outreach, User
-from app.models.enums import AtsType, OutreachStatus
+from app.models.enums import OutreachStatus
 from app.services.email.followups import Followups
 from app.services.email.pipeline import DraftPipeline, users_due_for_drafts
 from app.services.email.replies import WATCHED, ReplyChecker
 from app.services.email.scheduler import Scheduler
+from app.services.email.summary import send_summary, users_due_for_summary
 from app.services.jobs.poll import PollSources, hn_keywords, run_poll
 from app.services.matching.embed import embed_missing_jobs
 from app.services.matching.pipeline import Matcher, expire_matches
@@ -39,11 +40,10 @@ from app.services.registry import (
     get_llm_client,
 )
 from app.services.sources.adzuna import AdzunaSource
-from app.services.sources.ashby import AshbySource
-from app.services.sources.greenhouse import GreenhouseSource
+from app.services.sources.boards import board_sources
 from app.services.sources.hn import HNSource
 from app.services.sources.http import PoliteHttpClient
-from app.services.sources.lever import LeverSource
+from app.services.sources.remotive import RemotiveSource
 
 log = logging.getLogger("app.workers")
 
@@ -60,13 +60,10 @@ async def poll_sources(ctx: dict[str, Any]) -> dict[str, int]:
             keywords = await hn_keywords(session)
         hn = HNSource(http, get_llm_client(), get_redis(), keywords=keywords)
     sources = PollSources(
-        boards={
-            AtsType.GREENHOUSE: GreenhouseSource(http),
-            AtsType.LEVER: LeverSource(http),
-            AtsType.ASHBY: AshbySource(http),
-        },
+        boards=board_sources(http),
         adzuna=AdzunaSource(http, settings.adzuna_app_id, settings.adzuna_app_key),
         hn=hn,
+        remotive=RemotiveSource(http),
     )
     summary = await run_poll(sessions, sources)
     # PLAN.md §8: embed_new_jobs runs after poll_sources, match_jobs_for_users after embedding.
@@ -255,6 +252,29 @@ async def create_followups(ctx: dict[str, Any], user_id: str | None = None) -> d
     return totals
 
 
+async def send_weekly_summaries(ctx: dict[str, Any]) -> dict[str, int]:
+    """Hourly; each user's summary goes out on Monday at 08:30 their time (PLAN.md Phase 10)."""
+    now = datetime.now(UTC)
+    async with get_sessionmaker()() as session:
+        user_ids = await users_due_for_summary(session, get_redis(), now)
+    totals: dict[str, int] = {"users": len(user_ids)}
+    gmail = get_gmail_factory()
+    for uid in user_ids:
+        with log_context(user_id=uid):
+            async with get_sessionmaker()() as session:
+                user = await session.get(User, uid)
+                if user is None:
+                    continue
+                try:
+                    result = await send_summary(session, user, gmail, now)
+                except Exception:
+                    log.exception("weekly summary failed for user %s", uid)
+                    result = "failed"
+        totals[result] = totals.get(result, 0) + 1
+    log.info("send_weekly_summaries: %s", totals)
+    return totals
+
+
 async def startup(ctx: dict[str, Any]) -> None:
     configure_logging()
     init_sentry("worker")
@@ -282,6 +302,7 @@ class WorkerSettings:
         func(discover_prospect_companies, keep_result=60, timeout=3600),
         func(match_companies_for_users, keep_result=60),
         func(first_run, keep_result=60, timeout=3600),
+        send_weekly_summaries,
     ]
     cron_jobs: ClassVar[list[CronJob]] = [
         # Every 6h, off the top of the hour. Not at startup: restarts shouldn't hammer job boards.
@@ -292,6 +313,8 @@ class WorkerSettings:
         cron(schedule_and_send, minute=set(range(0, 60, 5)), timeout=600, unique=True),
         cron(check_replies, minute={11, 41}, timeout=900, unique=True),
         cron(create_followups, minute={4}, timeout=1800, unique=True),
+        # Hourly; each user's weekly summary goes out at 08:30 their time on Mondays.
+        cron(send_weekly_summaries, minute={30}, timeout=900, unique=True),
         # Daily, before the morning drafts in India (23:37 UTC is 05:07 IST); matching follows it.
         cron(discover_prospect_companies, hour={23}, minute=37, timeout=3600, unique=True),
     ]

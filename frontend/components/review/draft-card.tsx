@@ -29,8 +29,9 @@ import {
   useRegenerateDraft,
   useReviewAction,
 } from "@/lib/queries";
-import type { OutreachDetail } from "@/lib/types";
+import { type OutreachDetail, STYLE_NAMES } from "@/lib/types";
 import { scoreClass } from "@/lib/score";
+import { WarmPathNote } from "@/components/warm-path";
 
 /** One draft in review: job, contact, email (editable), tailored resume, and the actions. */
 export function DraftCard({
@@ -62,6 +63,7 @@ export function DraftCard({
         </p>
       )}
       <ContactBlock draft={draft} editable={inReview} />
+      <WarmPathNote path={draft.warm_path} knowsContact={draft.knows_contact} />
 
       {editing ? (
         <EmailEditor draft={draft} onClose={() => setEditing(false)} />
@@ -343,7 +345,14 @@ function EmailView({ draft }: { draft: OutreachDetail }) {
   return (
     <section className="flex flex-col gap-2">
       <div>
-        <p className="text-muted-foreground text-xs">Subject</p>
+        <p className="text-muted-foreground flex items-center gap-2 text-xs">
+          Subject
+          {draft.draft_variant && (
+            <span title="Drafts alternate between two styles; the tracker shows which gets more replies.">
+              · {STYLE_NAMES[draft.draft_variant]} style
+            </span>
+          )}
+        </p>
         <p className="font-medium">{draft.subject}</p>
       </div>
       <div className="bg-surface ring-foreground/[0.07] rounded-2xl px-5 py-5 text-[0.95rem] leading-7 whitespace-pre-wrap ring-1 sm:px-7 sm:py-6">
@@ -503,6 +512,13 @@ function AttachmentRow({ draft }: { draft: OutreachDetail }) {
         >
           <FileText className="size-4" />
           {draft.resume_filename ?? "Resume.pdf"}
+        </a>
+        <a
+          href={`/api/outreach/${draft.id}/resume.docx`}
+          className="text-muted-foreground underline-offset-4 hover:underline"
+          title="Same resume as Word, for a referrer whose ATS prefers it. Emails still attach the PDF."
+        >
+          Word version
         </a>
         {draft.ats && (
           <span className="inline-flex items-center gap-1.5">

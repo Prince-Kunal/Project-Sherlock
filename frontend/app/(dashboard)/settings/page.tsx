@@ -1,11 +1,13 @@
 import { PageHeader } from "@/components/page-header";
 import { ApolloKeyCard } from "@/components/settings/apollo-key-card";
+import { ConnectionsCard } from "@/components/settings/connections-card";
 import { DeleteAccountCard } from "@/components/settings/delete-account-card";
 import { DraftMixCard } from "@/components/settings/draft-mix-card";
 import { HunterKeyCard } from "@/components/settings/hunter-key-card";
 import { LlmKeyCard } from "@/components/settings/llm-key-card";
 import { ScheduleCard } from "@/components/settings/schedule-card";
 import { SendingCard } from "@/components/settings/sending-card";
+import { SourcesCard } from "@/components/settings/sources-card";
 import { UsageCard } from "@/components/settings/usage-card";
 
 export default function SettingsPage() {
@@ -18,6 +20,8 @@ export default function SettingsPage() {
       <SendingCard />
       <ScheduleCard />
       <DraftMixCard />
+      <SourcesCard />
+      <ConnectionsCard />
       <UsageCard />
       <LlmKeyCard />
       <HunterKeyCard />

@@ -9,6 +9,7 @@ from app.api.routes import (
     admin,
     auth,
     companies,
+    connections,
     health,
     jobs,
     matches,
@@ -57,6 +58,7 @@ def create_app() -> FastAPI:
     app.include_router(outreach.router)
     app.include_router(prospects.router)
     app.include_router(onboarding.router)
+    app.include_router(connections.router)
     app.include_router(admin.router)
     return app
 

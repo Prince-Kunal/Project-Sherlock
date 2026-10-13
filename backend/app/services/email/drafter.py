@@ -12,7 +12,7 @@ import hashlib
 import json
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from app.models import Company, Contact, Job
@@ -20,6 +20,7 @@ from app.models.enums import RoleCategory
 from app.schemas.outreach import DraftIssue, EmailDraft
 from app.schemas.resume import Basics
 from app.services.email.style import style_issues
+from app.services.email.variants import STYLES
 from app.services.llm.client import LLMClient
 from app.services.llm.prompt_loader import Prompt, load_prompt
 from app.services.llm.redaction import redact_pii
@@ -176,6 +177,33 @@ def company_sentences(company: Company, limit: int = 2) -> list[str]:
     return [redact_pii(s) for s in split_sentences(text) if 30 <= len(s) <= 300][:limit]
 
 
+# Sections of companies.website_text (services/prospects/website.py), most telling first.
+_RESEARCH_SECTIONS = ("Latest blog post", "About", "Homepage", "Careers")
+_SECTION_RE = re.compile(r"^([A-Z][A-Za-z ]{2,30}):$", re.M)
+
+
+def research_sentences(
+    company: Company, skills: set[str], lexicon: SkillLexicon, limit: int = 2
+) -> list[str]:
+    """The company research snippet (PLAN.md Phase 10): sentences from the company's own website,
+    preferring its latest blog post, those naming the candidate's skills first. Offered to the drafter
+    as extra hook candidates next to the job posting, so `personalization_source` may quote them."""
+    text = company.website_text or ""
+    sections: dict[str, str] = {}
+    marks = list(_SECTION_RE.finditer(text))
+    for i, mark in enumerate(marks):
+        end = marks[i + 1].start() if i + 1 < len(marks) else len(text)
+        sections[mark.group(1)] = text[mark.end() : end]
+    scored = []
+    for rank, name in enumerate(_RESEARCH_SECTIONS):
+        for position, sentence in enumerate(split_sentences(sections.get(name, ""))):
+            if not 40 <= len(sentence) <= 300 or sentence.endswith(":"):
+                continue
+            overlap = len(set(lexicon.find_in_text(sentence)) & skills)
+            scored.append((-overlap, rank, position, sentence))
+    return [redact_pii(s) for *_, s in sorted(scored)[:limit]]
+
+
 def open_context_sentences(
     company: Company, skills: set[str], lexicon: SkillLexicon, limit: int = 4
 ) -> list[str]:
@@ -297,6 +325,8 @@ class DraftInputs:
     highlights: list[str]  # the top tailored bullets, most relevant first
     skills: set[str]  # the candidate's canonical skills, for picking JD sentences
     hint: str | None = None
+    variant: str = "a"  # A/B draft style (services/email/variants.py)
+    research: list[str] = field(default_factory=list)  # sentences from the company's own site/blog
 
 
 @dataclass
@@ -313,6 +343,7 @@ class OpenDraftInputs:
     target_roles: list[str]
     employment_types: list[str]
     hint: str | None = None
+    variant: str = "a"
 
 
 @dataclass
@@ -338,7 +369,10 @@ class Drafter:
 
     def contexts(self, inputs: DraftInputs) -> list[str]:
         sentences = key_sentences(inputs.job.description_text, inputs.skills, self._lexicon)
-        return sentences + [s for s in company_sentences(inputs.company) if s not in sentences]
+        for extra in [*company_sentences(inputs.company), *inputs.research]:
+            if extra not in sentences:
+                sentences.append(extra)
+        return sentences
 
     def variables(self, inputs: DraftInputs, contexts: list[str]) -> dict[str, Any]:
         contact = inputs.contact
@@ -360,6 +394,7 @@ class Drafter:
         return {
             "inputs": json.dumps(payload, ensure_ascii=False, indent=2),
             "hint": redact_pii(inputs.hint.strip()) if inputs.hint and inputs.hint.strip() else "(none)",
+            "style": STYLES.get(inputs.variant, STYLES["a"]),
         }
 
     async def draft(self, inputs: DraftInputs, api_key: str | None) -> DraftResult:
@@ -396,6 +431,7 @@ class Drafter:
         return {
             "inputs": json.dumps(payload, ensure_ascii=False, indent=2),
             "hint": redact_pii(inputs.hint.strip()) if inputs.hint and inputs.hint.strip() else "(none)",
+            "style": STYLES.get(inputs.variant, STYLES["a"]),
         }
 
     async def draft_open(self, inputs: OpenDraftInputs, api_key: str | None) -> DraftResult:

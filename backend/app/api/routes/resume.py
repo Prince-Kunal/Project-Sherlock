@@ -22,6 +22,7 @@ from app.services.llm.user_keys import resolve_api_key
 from app.services.registry import get_llm_client
 from app.services.resume import store
 from app.services.resume.ats_check import AtsExpectations, AtsReport, ats_check
+from app.services.resume.docx_export import docx_response
 from app.services.resume.parser import ResumeExtractionError, parse_resume
 from app.services.resume.render import RenderError, render_resume, resume_filename
 from app.services.resume.skills import get_lexicon
@@ -142,6 +143,13 @@ async def preview_pdf(user: CurrentUser, session: Session, version: int | None =
             "Cache-Control": "no-store",
         },
     )
+
+
+@router.get("/preview.docx", response_class=Response)
+async def preview_docx(user: CurrentUser, session: Session, version: int | None = None) -> Response:
+    """The master resume as Word (PLAN.md Phase 10), for ATS that read DOCX better than PDF."""
+    resume = MasterResume.model_validate((await _load(session, user.id, version)).data)
+    return await docx_response(resume, None)
 
 
 @router.get("/ats-check", response_model=AtsReport)

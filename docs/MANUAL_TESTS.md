@@ -102,3 +102,23 @@ host, 2026-10-12). On the deployed instance:
 7. As the friend, **Settings → Delete my data**, type the address. Expected: back on the login page
    with the "Your data was deleted" note; the friend is gone from Admin → Usage; at
    <https://myaccount.google.com/permissions> Sherlock no longer has access.
+
+## Phase 10: browser extension and weekly summary
+
+**Extension** (`extension/README.md` has the install steps):
+
+1. Load `extension/` unpacked in Chrome and set its address to your Sherlock (default
+   `http://localhost:3000`). Be signed in to Sherlock in the same browser.
+2. Open a Greenhouse, Lever, Ashby, SmartRecruiters, Workable or Recruitee posting and click the
+   toolbar button. Expected: a Sherlock tab at `/add-job` says "Added to Sherlock" with the title
+   and company, and the job is on the Jobs page (source "Added by URL").
+3. On any other job page (a company's own careers page), the same works but uses your Gemini key.
+4. Right-click a job link on a list page → "Send this job link to Sherlock": same result without
+   opening the posting.
+
+**Weekly summary:** with real Gmail connected and something sent or waiting in the last week, the
+worker sends it on Monday 08:30 your time. To try it now, run in the backend container:
+`python -c "import asyncio; from app.workers.settings import send_weekly_summaries; print(asyncio.run(send_weekly_summaries({})))"`
+at 08:xx on a Monday, or call `app.services.email.summary.send_summary` directly. Expected: an
+email from you to yourself with the week's numbers and a link to the review queue; switching
+"Weekly summary email" off in Settings → Schedule stops it.

@@ -68,6 +68,13 @@ _HINTS: dict[str, EmploymentType] = {
     "temporary": "contract",
     "freelance": "contract",
     "parttime": "part_time",
+    # Recruitee / SmartRecruiters / Workable codes (Phase 10)
+    "fulltimepermanent": "full_time",
+    "fulltimefixedterm": "full_time",
+    "parttimepermanent": "part_time",
+    "parttimefixedterm": "part_time",
+    "traineeship": "internship",
+    "apprenticeship": "internship",
 }
 
 
@@ -161,6 +168,7 @@ _NOT_COMPANY_HOSTS = (
     "recruitee.com",
     "bamboohr.com",
     "smartrecruiters.com",
+    "remotive.com",
     "myworkdayjobs.com",
     "adzuna.in",
     "adzuna.com",

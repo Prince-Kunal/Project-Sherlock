@@ -32,6 +32,7 @@ import {
 } from "@/lib/queries";
 import type { Match, MatchFilters } from "@/lib/types";
 import { scoreClass } from "@/lib/score";
+import { WarmPathBadge } from "@/components/warm-path";
 
 const PAGE_SIZE = 30;
 
@@ -270,6 +271,7 @@ function MatchRow({ match }: { match: Match }) {
                 {job.employment_type &&
                   ` · ${TYPE_LABELS[job.employment_type]}`}
               </p>
+              <WarmPathBadge path={match.warm_path} />
             </div>
 
             {editable && (

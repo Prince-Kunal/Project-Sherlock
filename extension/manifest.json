@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Send to Sherlock",
+  "version": "0.1.0",
+  "description": "Send the job posting you're looking at to your Sherlock job list.",
+  "action": { "default_title": "Send this job to Sherlock" },
+  "background": { "service_worker": "background.js" },
+  "options_ui": { "page": "options.html", "open_in_tab": false },
+  "permissions": ["activeTab", "contextMenus", "storage"]
+}

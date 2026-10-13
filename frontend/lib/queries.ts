@@ -43,6 +43,8 @@ import type {
   SuppressionEntry,
   SuppressionPage,
   UsageReport,
+  ConnectionsSummary,
+  OutreachAnalytics,
 } from "@/lib/types";
 
 export const keys = {
@@ -762,5 +764,60 @@ export function useAddRegistryCompany() {
       }),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["admin", "companies"] }),
+  });
+}
+
+// --- Phase 10: warm paths, analytics ---------------------------------------------
+
+export function useConnections() {
+  return useQuery({
+    queryKey: ["connections"],
+    queryFn: () => apiFetch<ConnectionsSummary>("/connections"),
+  });
+}
+
+function invalidateWarmPaths(queryClient: ReturnType<typeof useQueryClient>) {
+  for (const key of [
+    ["connections"],
+    ["matches"],
+    ["company-matches"],
+    ["outreach"],
+  ]) {
+    void queryClient.invalidateQueries({ queryKey: key });
+  }
+}
+
+export function useUploadConnections() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => {
+      const body = new FormData();
+      body.append("file", file);
+      return apiFetch<ConnectionsSummary>("/connections", {
+        method: "POST",
+        body,
+      });
+    },
+    onSuccess: () => invalidateWarmPaths(queryClient),
+  });
+}
+
+export function useDeleteConnections() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiFetch<void>("/connections", { method: "DELETE" }),
+    onSuccess: () => invalidateWarmPaths(queryClient),
+  });
+}
+
+export function useAnalytics(days: number | null) {
+  return useQuery({
+    queryKey: ["outreach", "analytics", days],
+    queryFn: () =>
+      apiFetch<OutreachAnalytics>(
+        days
+          ? `/outreach/analytics?days=${days}`
+          : "/outreach/analytics?days=3650",
+      ),
   });
 }

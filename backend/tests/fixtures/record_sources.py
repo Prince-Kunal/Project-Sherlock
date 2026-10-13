@@ -259,6 +259,49 @@ def record_yc() -> None:
     save("yc/companies.json", [{k: c.get(k) for k in YC_FIELDS} for c in chosen])
 
 
+def record_more_sources() -> None:
+    """Phase 10: SmartRecruiters, Workable and Recruitee boards, and Remotive. People's names and
+    mailboxes in the payloads (posting creator, application inbox) are replaced."""
+    c = httpx.Client(timeout=30, headers=HEADERS, follow_redirects=True)
+
+    sr = c.get(
+        "https://api.smartrecruiters.com/v1/companies/Freshworks/postings", params={"limit": 100}
+    ).json()
+    sr["content"] = sr["content"][:3]
+    for posting in sr["content"]:
+        posting["creator"] = {"name": "Recruiter Name"}
+    save("smartrecruiters/board_freshworks.json", sr)
+    time.sleep(1)
+    detail = c.get(sr["content"][0]["ref"]).json()
+    detail["creator"] = {"name": "Recruiter Name"}
+    save("smartrecruiters/job_freshworks.json", detail)
+    time.sleep(1)
+
+    wk = c.get(
+        "https://apply.workable.com/api/v1/widget/accounts/huggingface", params={"details": "true"}
+    ).json()
+    wk["jobs"] = wk["jobs"][:3]
+    save("workable/board_huggingface.json", wk)
+    time.sleep(1)
+
+    rc = c.get("https://bunq.recruitee.com/api/offers/").json()
+    rc["offers"] = rc["offers"][:3]
+    for offer in rc["offers"]:
+        offer["mailbox_email"] = "jobs@example.invalid"
+    save("recruitee/board_bunq.json", rc)
+    time.sleep(1)
+
+    rm = c.get("https://remotive.com/api/remote-jobs", params={"category": "software-dev"}).json()
+    rm["jobs"] = rm["jobs"][:3]
+    save("remotive/jobs.json", rm)
+
+
 if __name__ == "__main__":
-    modes = {"adzuna": record_adzuna, "hunter": record_hunter, "gmail": record_gmail, "yc": record_yc}
+    modes = {
+        "adzuna": record_adzuna,
+        "hunter": record_hunter,
+        "gmail": record_gmail,
+        "yc": record_yc,
+        "more": record_more_sources,
+    }
     modes.get(sys.argv[1] if sys.argv[1:] else "", main)()

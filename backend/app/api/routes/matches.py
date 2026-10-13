@@ -23,6 +23,7 @@ from app.schemas.matches import MatchFeed, MatchOut, MatchStatusFilter, ScoringS
 from app.schemas.outreach import OutreachDetail, OutreachOut
 from app.schemas.resume import MasterResume
 from app.schemas.tailor import TailorPreviewOut
+from app.services.connections import WarmPath, warm_path_out, warm_paths
 from app.services.contacts.service import (
     OutreachConflictError,
     ProviderFactory,
@@ -56,7 +57,12 @@ _ACTIONS: dict[str, tuple[JobMatchStatus, tuple[JobMatchStatus, ...]]] = {
 
 
 def _out(
-    match: JobMatch, job: Job, company: Company, now: datetime, outreach: OutreachOut | None = None
+    match: JobMatch,
+    job: Job,
+    company: Company,
+    now: datetime,
+    outreach: OutreachOut | None = None,
+    warm: WarmPath | None = None,
 ) -> MatchOut:
     return MatchOut(
         id=match.id,
@@ -69,6 +75,7 @@ def _out(
         status=match.status,
         created_at=match.created_at,
         outreach=outreach,
+        warm_path=warm_path_out(warm),
     )
 
 
@@ -95,6 +102,7 @@ async def list_matches(
             max_job_age_days=prefs.max_job_age_days,
             employment_types=list(prefs.employment_types),
             company_stages=list(prefs.company_stages),
+            job_sources=list(prefs.job_sources),
             now=now,
         ),
     ]
@@ -132,9 +140,17 @@ async def list_matches(
     calls = await llm_calls_since(session, user.id, OPERATION, daily_window_start(now))
     key = await get_key_row(session, user.id)
     outreach = await latest_outreach_by_job(session, user.id, [j.id for _, j, _ in rows])
+    warm = await warm_paths(session, user.id, [c for _, _, c in rows])
     return MatchFeed(
         items=[
-            _out(m, j, c, now, await outreach_out(session, outreach[j.id]) if j.id in outreach else None)
+            _out(
+                m,
+                j,
+                c,
+                now,
+                await outreach_out(session, outreach[j.id]) if j.id in outreach else None,
+                warm.get(c.id),
+            )
             for m, j, c in rows
         ],
         total=total,
@@ -192,7 +208,8 @@ async def _set_status(
         match.status = target
         await session.commit()
         await session.refresh(match)
-    return _out(match, job, company, datetime.now(UTC))
+    warm = await warm_paths(session, match.user_id, [company])
+    return _out(match, job, company, datetime.now(UTC), warm=warm.get(company.id))
 
 
 @router.post("/{match_id}/shortlist", response_model=MatchOut)

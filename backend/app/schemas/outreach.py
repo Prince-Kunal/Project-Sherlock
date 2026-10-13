@@ -15,6 +15,7 @@ from app.models.enums import (
     RoleCategory,
     VerificationStatus,
 )
+from app.schemas.connections import WarmPathOut
 from app.schemas.jobs import CompanyBrief, JobOut
 from app.schemas.tailor import ResumeChange
 from app.services.resume.ats_check import AtsReport, KeywordCoverage
@@ -73,6 +74,7 @@ class OutreachOut(BaseModel):
     failure_reason: str | None
     failure_message: str | None = None  # the human-readable detail of the last failure
     created_at: datetime
+    draft_variant: str | None = None  # A/B email style, "a" or "b" (Phase 10)
 
 
 class ManualContactIn(BaseModel):
@@ -100,6 +102,8 @@ class OutreachListItem(OutreachOut):
 class OutreachDetail(OutreachListItem):
     """Everything the review card shows."""
 
+    warm_path: WarmPathOut | None = None  # people the user knows at this company (Phase 10)
+    knows_contact: bool = False  # the recipient is one of the user's own connections
     body: str | None
     personalization_source: str | None
     match_id: uuid.UUID | None
@@ -168,3 +172,31 @@ class TimelineEntry(BaseModel):
     title: str
     text: str | None = None  # the email sent, or the reply received
     reason: str | None = None
+
+
+class AnalyticsBucket(BaseModel):
+    key: str
+    label: str
+    sent: int
+    replied: int
+    reply_rate: float | None
+    referred: int
+    interview: int
+
+
+class OutreachAnalytics(BaseModel):
+    """Reply rates of the user's first emails (PLAN.md Phase 10)."""
+
+    since: datetime | None
+    sent: int
+    replied: int
+    reply_rate: float | None
+    referred: int
+    interview: int
+    by_role: list[AnalyticsBucket]
+    by_stage: list[AnalyticsBucket]
+    by_variant: list[AnalyticsBucket]
+    by_mode: list[AnalyticsBucket]
+    leader: str | None  # the draft style ("a"/"b") with more replies, once there's enough data
+    verdict: str
+    draft_style: str  # the user's setting: "ab" (testing both) or "a" / "b"

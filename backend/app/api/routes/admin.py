@@ -27,11 +27,9 @@ from app.schemas.jobs import CompanyIn, CompanyOut
 from app.schemas.settings import AllowedEmailIn, AllowedEmailOut
 from app.services.quotas import LLM_PROVIDERS, LOOKUP_OPERATIONS, month_start, quota_status
 from app.services.registry import get_source_http
-from app.services.sources.ashby import AshbySource
 from app.services.sources.base import CompanyRef, JobSource
-from app.services.sources.greenhouse import GreenhouseSource
+from app.services.sources.boards import board_sources
 from app.services.sources.http import PoliteHttpClient, SourceHTTPError
-from app.services.sources.lever import LeverSource
 from app.services.sources.text import normalize_domain
 from app.workers.queue import enqueue
 
@@ -41,13 +39,7 @@ Session = Annotated[AsyncSession, Depends(get_session)]
 
 
 def _board_source(ats: AtsType, http: PoliteHttpClient) -> JobSource | None:
-    if ats == AtsType.GREENHOUSE:
-        return GreenhouseSource(http)
-    if ats == AtsType.LEVER:
-        return LeverSource(http)
-    if ats == AtsType.ASHBY:
-        return AshbySource(http)
-    return None
+    return board_sources(http).get(ats)
 
 
 @router.get("/companies", response_model=list[CompanyOut])

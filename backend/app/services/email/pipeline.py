@@ -54,8 +54,15 @@ from app.services.contacts.service import (
     start_job_outreach,
     start_open_outreach,
 )
-from app.services.email.drafter import Drafter, DraftError, DraftInputs, OpenDraftInputs
+from app.services.email.drafter import (
+    Drafter,
+    DraftError,
+    DraftInputs,
+    OpenDraftInputs,
+    research_sentences,
+)
 from app.services.email.state import transition
+from app.services.email.variants import choose_variant
 from app.services.llm.client import (
     LLMAuthError,
     LLMClient,
@@ -268,6 +275,10 @@ class DraftPipeline:
             outreach.ats_keyword_coverage = result.keyword_coverage.model_dump(mode="json")
             await session.flush()
 
+        if outreach.draft_variant is None:
+            prefs = await load_preferences(session, user_id)
+            outreach.draft_variant = await choose_variant(session, user_id, prefs.draft_style)
+            await session.flush()
         try:
             async with _llm_step(session, user_id, DRAFT_OPERATION):
                 if job is not None:
@@ -313,6 +324,12 @@ class DraftPipeline:
     async def _has_company_text(self, session: AsyncSession, company: Company) -> bool:
         """Open outreach quotes the company's own text; read its website now if there's none yet."""
         if company.description or company.website_text:
+            return True
+        return await self._read_website(session, company)
+
+    async def _read_website(self, session: AsyncSession, company: Company) -> bool:
+        """Fetch the company's site once (home, about, careers, latest blog post) if never tried."""
+        if company.website_text:
             return True
         if self._fetcher is None or not company.domain or company.website_fetched_at is not None:
             return False
@@ -360,6 +377,7 @@ class DraftPipeline:
             about_me=prefs.about_me,
             highlights=highlights(outreach.tailored_resume or {}),
             skills=master_skill_set(master, self._lexicon),
+            variant=outreach.draft_variant or "a",
             angle=match.angle if match else "",
             target_roles=list(target.target_roles if target and target.target_roles else prefs.target_roles),
             employment_types=list(prefs.employment_types),
@@ -377,6 +395,9 @@ class DraftPipeline:
         hint: str | None = None,
     ) -> DraftInputs:
         prefs = await load_preferences(session, outreach.user_id)
+        skills = master_skill_set(master, self._lexicon)
+        # Phase 10: a line or two from the company's own site or latest blog post, as hook candidates.
+        await self._read_website(session, company)
         return DraftInputs(
             job=job,
             company=company,
@@ -384,8 +405,10 @@ class DraftPipeline:
             basics=master.basics,
             about_me=prefs.about_me,
             highlights=highlights(outreach.tailored_resume or {}),
-            skills=master_skill_set(master, self._lexicon),
+            skills=skills,
             hint=hint,
+            variant=outreach.draft_variant or "a",
+            research=research_sentences(company, skills, self._lexicon),
         )
 
     async def regenerate(
@@ -448,6 +471,7 @@ class DraftPipeline:
                         max_job_age_days=prefs.max_job_age_days,
                         employment_types=list(prefs.employment_types),
                         company_stages=list(prefs.company_stages),
+                        job_sources=list(prefs.job_sources),
                         now=self.now(),
                     ),
                 )

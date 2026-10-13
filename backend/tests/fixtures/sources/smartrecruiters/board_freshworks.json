@@ -1,0 +1,190 @@
+{
+  "offset": 0,
+  "limit": 100,
+  "totalFound": 122,
+  "content": [
+    {
+      "id": "744000154405299",
+      "name": "Lead Software Engineer - Systems",
+      "uuid": "e9538fad-fbda-4a1f-b8f7-ee2609854f92",
+      "jobAdId": "cd127ac4-c1c8-49e7-9d87-4a613e65f9cd",
+      "defaultJobAd": true,
+      "refNumber": "P100628_1",
+      "company": {
+        "identifier": "Freshworks",
+        "name": "Freshworks"
+      },
+      "releasedDate": "2026-10-08T10:53:04.656Z",
+      "location": {
+        "city": "Chennai",
+        "country": "in",
+        "remote": false,
+        "hybrid": false,
+        "fullLocation": "Chennai, , India"
+      },
+      "industry": {
+        "id": "it_and_services",
+        "label": "Information Technology And Services"
+      },
+      "department": {},
+      "function": {
+        "id": "other",
+        "label": "Other"
+      },
+      "typeOfEmployment": {
+        "id": "permanent",
+        "label": "Full-time"
+      },
+      "experienceLevel": {
+        "id": "mid_senior_level",
+        "label": "Mid-Senior Level"
+      },
+      "customField": [
+        {
+          "fieldId": "618bba30fa9dfa25d877c58b",
+          "fieldLabel": "Brands",
+          "valueId": "default",
+          "valueLabel": "Freshworks"
+        },
+        {
+          "fieldId": "COUNTRY",
+          "fieldLabel": "Country/Region",
+          "valueId": "in",
+          "valueLabel": "India"
+        }
+      ],
+      "visibility": "PUBLIC",
+      "ref": "https://api.smartrecruiters.com/v1/companies/Freshworks/postings/744000154405299",
+      "creator": {
+        "name": "Recruiter Name"
+      },
+      "language": {
+        "code": "en",
+        "label": "English",
+        "labelNative": "English (US)"
+      }
+    },
+    {
+      "id": "744000154351019",
+      "name": "Staff Engineer - Full Stack",
+      "uuid": "b16d80ba-5fd4-47e9-b944-8d140c47c4e5",
+      "jobAdId": "3aaff19e-f6e3-4b3a-b3e5-c7a19b0d6f79",
+      "defaultJobAd": true,
+      "refNumber": "P-1001629_1",
+      "company": {
+        "identifier": "Freshworks",
+        "name": "Freshworks"
+      },
+      "releasedDate": "2026-10-08T06:17:26.279Z",
+      "location": {
+        "city": "Chennai",
+        "country": "in",
+        "remote": false,
+        "hybrid": false,
+        "fullLocation": "Chennai, , India"
+      },
+      "industry": {
+        "id": "it_and_services",
+        "label": "Information Technology And Services"
+      },
+      "department": {},
+      "function": {
+        "id": "other",
+        "label": "Other"
+      },
+      "typeOfEmployment": {
+        "id": "permanent",
+        "label": "Full-time"
+      },
+      "experienceLevel": {
+        "id": "mid_senior_level",
+        "label": "Mid-Senior Level"
+      },
+      "customField": [
+        {
+          "fieldId": "618bba30fa9dfa25d877c58b",
+          "fieldLabel": "Brands",
+          "valueId": "default",
+          "valueLabel": "Freshworks"
+        },
+        {
+          "fieldId": "COUNTRY",
+          "fieldLabel": "Country/Region",
+          "valueId": "in",
+          "valueLabel": "India"
+        }
+      ],
+      "visibility": "PUBLIC",
+      "ref": "https://api.smartrecruiters.com/v1/companies/Freshworks/postings/744000154351019",
+      "language": {
+        "code": "en",
+        "label": "English",
+        "labelNative": "English (US)"
+      },
+      "creator": {
+        "name": "Recruiter Name"
+      }
+    },
+    {
+      "id": "744000154016769",
+      "name": "Lead - Workplace Management (Travel & Transport Operations)",
+      "uuid": "9e126e69-8458-46b1-98f3-a63d30b9eaf6",
+      "jobAdId": "6e332623-26b6-43e5-a0f1-2debd29df095",
+      "defaultJobAd": true,
+      "refNumber": "P-1007140_1",
+      "company": {
+        "identifier": "Freshworks",
+        "name": "Freshworks"
+      },
+      "releasedDate": "2026-10-07T06:43:41.736Z",
+      "location": {
+        "city": "Chennai",
+        "country": "in",
+        "remote": false,
+        "hybrid": false,
+        "fullLocation": "Chennai, , India"
+      },
+      "industry": {
+        "id": "it_and_services",
+        "label": "Information Technology And Services"
+      },
+      "department": {},
+      "function": {
+        "id": "other",
+        "label": "Other"
+      },
+      "typeOfEmployment": {
+        "id": "permanent",
+        "label": "Full-time"
+      },
+      "experienceLevel": {
+        "id": "mid_senior_level",
+        "label": "Mid-Senior Level"
+      },
+      "customField": [
+        {
+          "fieldId": "618bba30fa9dfa25d877c58b",
+          "fieldLabel": "Brands",
+          "valueId": "default",
+          "valueLabel": "Freshworks"
+        },
+        {
+          "fieldId": "COUNTRY",
+          "fieldLabel": "Country/Region",
+          "valueId": "in",
+          "valueLabel": "India"
+        }
+      ],
+      "visibility": "PUBLIC",
+      "ref": "https://api.smartrecruiters.com/v1/companies/Freshworks/postings/744000154016769",
+      "language": {
+        "code": "en",
+        "label": "English",
+        "labelNative": "English (US)"
+      },
+      "creator": {
+        "name": "Recruiter Name"
+      }
+    }
+  ]
+}

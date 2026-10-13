@@ -1,5 +1,5 @@
 ---
-version: 1
+version: 2
 ---
 # Task: write the middle of a short cold email to someone at a company that hasn't posted a job
 
@@ -44,7 +44,7 @@ little informal, and short. A program checks your answer and rejects it if a rul
   "the Backend Intern role" is not.
 
 ## How real people write these
-- They say who they are and what they've built in a sentence or two, then ask.
+- They follow the shape given under "Shape of this email" below, in their own words.
 - Contractions and ordinary words. Sentences vary in length; some are short.
 - They don't summarise the company back to the person who works there, and they don't explain why
   they fit ("this aligns with", "which connects to"). They say what they did and let the reader
@@ -100,6 +100,9 @@ To an engineering manager, ask "for a 15-minute chat or to pass the resume on":
 
 What NOT to write: "I came across Ledgerline and was excited to see you're hiring for the Backend
 Intern role. I'd love to apply for the position, as my skills align perfectly with your team."
+
+## Shape of this email
+{{style}}
 
 ## Inputs
 ```json

@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.enums import JobMatchStatus
+from app.schemas.connections import WarmPathOut
 from app.schemas.jobs import JobOut
 from app.schemas.outreach import OutreachOut
 
@@ -48,6 +49,7 @@ class MatchOut(BaseModel):
     status: JobMatchStatus
     created_at: datetime
     outreach: OutreachOut | None = None  # the latest outreach for this job, if any
+    warm_path: WarmPathOut | None = None  # people the user knows there (Phase 10)
 
 
 class ScoringStatus(BaseModel):

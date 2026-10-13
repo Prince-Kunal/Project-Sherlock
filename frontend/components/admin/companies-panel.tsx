@@ -25,6 +25,9 @@ const ATS: { value: AtsType; label: string }[] = [
   { value: "greenhouse", label: "Greenhouse" },
   { value: "lever", label: "Lever" },
   { value: "ashby", label: "Ashby" },
+  { value: "smartrecruiters", label: "SmartRecruiters" },
+  { value: "workable", label: "Workable" },
+  { value: "recruitee", label: "Recruitee" },
   { value: "none", label: "No job board" },
 ];
 const SIZES: { value: SizeHint; label: string }[] = [
@@ -33,6 +36,17 @@ const SIZES: { value: SizeHint; label: string }[] = [
   { value: "mid", label: "Mid-size" },
   { value: "large", label: "Large" },
 ];
+// The board's name in its public URL, per ATS.
+const TOKEN_HINTS: Record<AtsType, string> = {
+  greenhouse: "boards.greenhouse.io/<this>",
+  lever: "jobs.lever.co/<this>",
+  ashby: "jobs.ashbyhq.com/<this>",
+  smartrecruiters: "jobs.smartrecruiters.com/<this>",
+  workable: "apply.workable.com/<this>",
+  recruitee: "<this>.recruitee.com",
+  none: "",
+};
+
 const EMPTY: RegistryCompanyIn = {
   name: "",
   domain: null,
@@ -92,7 +106,7 @@ function AddCompanyForm() {
         <Label className="flex flex-col items-stretch gap-1 font-normal">
           <span className="text-sm">Board token</span>
           <Input
-            placeholder="e.g. stripe"
+            placeholder={TOKEN_HINTS[c.ats_type]}
             disabled={c.ats_type === "none"}
             required={c.ats_type !== "none"}
             value={c.ats_token ?? ""}

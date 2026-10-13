@@ -33,6 +33,7 @@ import type {
   CompanyMatchFilters,
   ProspectTarget,
 } from "@/lib/types";
+import { WarmPathBadge } from "@/components/warm-path";
 
 const PAGE_SIZE = 30;
 
@@ -326,6 +327,11 @@ function CompanyRow({ match }: { match: CompanyMatch }) {
           </div>
 
           {match.angle && <p className="mt-2 text-sm">{match.angle}</p>}
+          {match.warm_path && (
+            <div className="mt-2">
+              <WarmPathBadge path={match.warm_path} />
+            </div>
+          )}
           {company.industry_tags.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
               {company.industry_tags.slice(0, 6).map((tag) => (

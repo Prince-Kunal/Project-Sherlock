@@ -47,6 +47,18 @@ export function PreviewPanel({ version }: { version: number }) {
             </AlertDescription>
           </Alert>
         ))}
+      <p className="text-sm">
+        <a
+          className="underline underline-offset-4"
+          href={`/api/resume/preview.docx?version=${version}`}
+        >
+          Download as Word (.docx)
+        </a>
+        <span className="text-muted-foreground">
+          {" "}
+          for an application form or referrer that asks for Word.
+        </span>
+      </p>
       <iframe
         title="Resume preview"
         src={`/api/resume/preview.pdf?version=${version}`}

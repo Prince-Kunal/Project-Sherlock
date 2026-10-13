@@ -1,12 +1,13 @@
-"""POST /jobs/manual {url}: turn a pasted job URL into a JobIn.
+"""POST /jobs/manual {url}: turn a pasted job URL into a JobIn (also what the browser extension sends).
 
-Greenhouse, Lever and Ashby posting URLs are fetched through their public APIs (deterministic, no
-LLM). Any other page is fetched, cleaned with readability, and parsed by the fast LLM model.
+Greenhouse, Lever, Ashby, SmartRecruiters, Workable and Recruitee posting URLs are fetched through
+their public APIs (deterministic, no LLM). Any other page is fetched, cleaned with readability, and
+parsed by the fast LLM model.
 """
 
 import re
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, Protocol
 from urllib.parse import parse_qs, urlparse
 
 from pydantic import BaseModel
@@ -17,16 +18,19 @@ from app.services.llm.client import LLMClient
 from app.services.llm.prompt_loader import load_prompt
 from app.services.llm.redaction import redact_pii
 from app.services.sources.ashby import AshbySource
-from app.services.sources.base import JobIn, MalformedJobError
+from app.services.sources.base import JobIn, MalformedJobError, RawJob
 from app.services.sources.greenhouse import GreenhouseSource
 from app.services.sources.http import PoliteHttpClient
 from app.services.sources.lever import LeverSource
+from app.services.sources.recruitee import RecruiteeSource
+from app.services.sources.smartrecruiters import SmartRecruitersSource
 from app.services.sources.text import (
     company_domain_from_url,
     detect_employment_type,
     detect_remote,
     html_to_text,
 )
+from app.services.sources.workable import WorkableSource
 
 _GREENHOUSE_RE = re.compile(r"^(?:job-boards(?:\.eu)?|boards(?:\.eu)?)\.greenhouse\.io$")
 _UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
@@ -59,6 +63,13 @@ def parse_ats_url(url: str) -> AtsLink | None:
         return AtsLink(AtsType.LEVER, parts[0], parts[1])
     if host == "jobs.ashbyhq.com" and len(parts) >= 2 and re.fullmatch(_UUID, parts[1]):
         return AtsLink(AtsType.ASHBY, parts[0], parts[1])
+    sr_host = host in {"jobs.smartrecruiters.com", "careers.smartrecruiters.com"}
+    if sr_host and len(parts) >= 2 and (posting := re.match(r"^(\d+)", parts[1])):
+        return AtsLink(AtsType.SMARTRECRUITERS, parts[0], posting.group(1))
+    if host == "apply.workable.com" and len(parts) >= 3 and parts[1] == "j":
+        return AtsLink(AtsType.WORKABLE, parts[0], parts[2])
+    if host.endswith(".recruitee.com") and len(parts) >= 2 and parts[0] == "o":
+        return AtsLink(AtsType.RECRUITEE, host.removesuffix(".recruitee.com"), parts[1])
     return None
 
 
@@ -77,13 +88,24 @@ class ManualJob:
     ats: AtsLink | None  # set when the posting came from a known ATS board
 
 
+class _SingleJobSource(Protocol):
+    async def fetch_job(self, token: str, job_id: str) -> RawJob: ...
+
+    def normalize(self, raw: RawJob) -> JobIn: ...
+
+
 class ManualJobResolver:
     def __init__(self, http: PoliteHttpClient, llm: LLMClient) -> None:
         self._http = http
         self._llm = llm
-        self._greenhouse = GreenhouseSource(http)
-        self._lever = LeverSource(http)
-        self._ashby = AshbySource(http)
+        self._sources: dict[AtsType, _SingleJobSource] = {
+            AtsType.GREENHOUSE: GreenhouseSource(http),
+            AtsType.LEVER: LeverSource(http),
+            AtsType.ASHBY: AshbySource(http),
+            AtsType.SMARTRECRUITERS: SmartRecruitersSource(http),
+            AtsType.WORKABLE: WorkableSource(http),
+            AtsType.RECRUITEE: RecruiteeSource(http),
+        }
 
     async def resolve(self, url: str, api_key: str | None) -> ManualJob:
         link = parse_ats_url(url)
@@ -92,15 +114,8 @@ class ManualJobResolver:
         return ManualJob(job=await self._from_page(url, api_key), ats=None)
 
     async def _from_ats(self, link: AtsLink, url: str) -> JobIn:
-        if link.ats == AtsType.GREENHOUSE:
-            raw = await self._greenhouse.fetch_job(link.token, link.job_id)
-            job = self._greenhouse.normalize(raw)
-        elif link.ats == AtsType.LEVER:
-            raw = await self._lever.fetch_job(link.token, link.job_id)
-            job = self._lever.normalize(raw)
-        else:
-            raw = await self._ashby.fetch_job(link.token, link.job_id)
-            job = self._ashby.normalize(raw)
+        source = self._sources[link.ats]
+        job = source.normalize(await source.fetch_job(link.token, link.job_id))
         return job.model_copy(
             update={
                 "source": JobSourceType.MANUAL,

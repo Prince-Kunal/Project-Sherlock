@@ -12,6 +12,7 @@ from app.schemas.jobs import CompanyBrief, JobOut
 from app.schemas.outreach import ContactOut, OutreachDetail, OutreachListItem, OutreachOut, TimelineEntry
 from app.schemas.resume import MasterResume
 from app.schemas.tailor import ResumeChange
+from app.services.connections import knows_contact, warm_path_out, warm_paths
 from app.services.email.drafter import opening_claims
 from app.services.email.style import style_issues
 from app.services.resume.ats_check import AtsReport, KeywordCoverage
@@ -39,6 +40,7 @@ async def outreach_out(session: AsyncSession, outreach: Outreach) -> OutreachOut
         failure_reason=outreach.failure_reason,
         failure_message=message,
         created_at=outreach.created_at,
+        draft_variant=outreach.draft_variant,
     )
 
 
@@ -144,8 +146,12 @@ async def outreach_detail(session: AsyncSession, outreach: Outreach) -> Outreach
             OutreachEvent.outreach_id == outreach.id, OutreachEvent.type == OutreachEventType.UPGRADED_TO_JOB
         )
     )
+    warm = (await warm_paths(session, outreach.user_id, [company])).get(company.id) if company else None
+    contact = await session.get(Contact, outreach.contact_id) if outreach.contact_id else None
     return OutreachDetail(
         **item.model_dump(),
+        warm_path=warm_path_out(warm),
+        knows_contact=knows_contact(warm, contact.full_name if contact else None),
         body=outreach.body,
         personalization_source=outreach.personalization_source,
         match_id=match.id if match else None,

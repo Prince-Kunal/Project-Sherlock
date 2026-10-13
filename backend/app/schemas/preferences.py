@@ -5,6 +5,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 
 ShortText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+Feed = Literal["boards", "adzuna", "hn", "remotive"]  # app.models.enums.JobFeed
+ALL_FEEDS: list[Feed] = ["boards", "adzuna", "hn", "remotive"]
 
 
 class PreferencesBase(BaseModel):
@@ -24,6 +26,15 @@ class PreferencesBase(BaseModel):
     paused: bool = False
     about_me: str = Field("", max_length=300)
     timezone: str = "Asia/Kolkata"
+    # Phase 10: where matches come from (manual jobs always count), and the Monday summary email.
+    job_sources: list[Feed] = Field(default_factory=lambda: list(ALL_FEEDS))
+    weekly_summary: bool = True
+    draft_style: Literal["ab", "a", "b"] = "ab"  # test both email styles, or use only one
+
+    @field_validator("job_sources")
+    @classmethod
+    def _dedupe_sources(cls, value: list[Feed]) -> list[Feed]:
+        return [f for f in ALL_FEEDS if f in value]
 
     @field_validator("timezone")
     @classmethod

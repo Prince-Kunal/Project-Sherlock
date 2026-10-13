@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { errorMessage } from "@/lib/api";
 import { usePreferences, useSavePreferences } from "@/lib/queries";
 import { type Preferences, pickPreferences } from "@/lib/types";
@@ -24,6 +25,7 @@ const SCHEDULE_KEYS = [
   "send_window_start",
   "send_window_end",
   "timezone",
+  "weekly_summary",
 ] as const;
 
 function Field({
@@ -119,6 +121,19 @@ function ScheduleFields({ initial }: { initial: Preferences }) {
           />
         </Field>
       </div>
+      <Label className="items-start gap-2.5 font-normal">
+        <Switch
+          checked={p.weekly_summary}
+          onCheckedChange={(weekly_summary) => set({ weekly_summary })}
+        />
+        <span className="flex flex-col gap-0.5">
+          <span className="text-sm">Weekly summary email</span>
+          <span className="text-muted-foreground text-xs">
+            Mondays at 08:30, from your Gmail to yourself: what was sent, the
+            replies, and what&apos;s waiting for you.
+          </span>
+        </span>
+      </Label>
       {!windowOk && (
         <p className="text-destructive text-sm">
           The send window must end after it starts.

@@ -1,0 +1,90 @@
+{
+  "id": "744000154405299",
+  "name": "Lead Software Engineer - Systems",
+  "uuid": "e9538fad-fbda-4a1f-b8f7-ee2609854f92",
+  "jobId": "d452458e-ad95-49f8-8c00-c4b00a8278f7",
+  "jobAdId": "cd127ac4-c1c8-49e7-9d87-4a613e65f9cd",
+  "defaultJobAd": true,
+  "refNumber": "P100628_1",
+  "company": {
+    "name": "Freshworks",
+    "identifier": "Freshworks"
+  },
+  "location": {
+    "city": "Chennai",
+    "country": "in",
+    "remote": false,
+    "hybrid": false,
+    "fullLocation": "Chennai, , India"
+  },
+  "customField": [
+    {
+      "fieldId": "618bba30fa9dfa25d877c58b",
+      "fieldLabel": "Brands",
+      "valueId": "default",
+      "valueLabel": "Freshworks"
+    },
+    {
+      "fieldId": "COUNTRY",
+      "fieldLabel": "Country/Region",
+      "valueId": "in",
+      "valueLabel": "India"
+    }
+  ],
+  "releasedDate": "2026-10-08T10:53:04.656Z",
+  "creator": {
+    "name": "Recruiter Name"
+  },
+  "postingUrl": "https://jobs.smartrecruiters.com/Freshworks/744000154405299-lead-software-engineer-systems",
+  "applyUrl": "https://jobs.smartrecruiters.com/Freshworks/744000154405299-lead-software-engineer-systems?oga=true",
+  "referralUrl": "https://jobs.smartrecruiters.com/external-referrals/company/Freshworks/publication/e9538fad-fbda-4a1f-b8f7-ee2609854f92?dcr_ci=Freshworks",
+  "jobAd": {
+    "sections": {
+      "companyDescription": {
+        "title": "Company Description",
+        "text": "<p>Organizations everywhere struggle under the crushing costs and complexities of “solutions” that promise to simplify their lives. To create a better experience for their customers and employees. To help them grow. Software is a choice that can make or break a business. Create better or worse experiences. Propel or throttle growth. Business software has become a blocker instead of ways to get work done.</p><p><strong>There’s another option. Freshworks. With a fresh vision for how the world works.</strong></p><p>At Freshworks, we build uncomplicated service software that delivers exceptional customer and employee experiences. Our enterprise-grade solutions are powerful, yet easy to use, and quick to deliver results. Our people-first approach to AI eliminates friction, making employees more effective and organizations more productive. Over 72,000 companies, including Bridgestone, New Balance, Nucor, S&amp;P Global, and Sony Music, trust Freshworks’ customer experience (CX) and employee experience (EX) software to fuel customer loyalty and service efficiency. And, over 4,500 Freshworks employees make this possible, all around the world.</p><p><strong><em>Fresh vision. Real impact. Come build it with us.</em></strong></p>"
+      },
+      "jobDescription": {
+        "title": "Job Description",
+        "text": "<p><strong>Impact you can create</strong></p><ul><li><p><strong>Architect From Scratch:</strong> Take complete ownership of building multi-tenant, cloud-native applications from scratch and guiding them through multiple production iterations.</p></li><li><p><strong>Guarantee Production Excellence:</strong> Ensure mission-critical systems achieve high availability (99.99%+), robust security, and deep observability.</p></li><li><p><strong>Act as a Force Multiplier:</strong> Mentor 2–4 systems engineers, raise the bar for code quality through reviews, and lead technical conversations across multiple engineering teams.</p></li><li><p><strong>Drive Efficiency Through Innovation:</strong> Harness and apply cutting-edge AI tools and technologies to optimize internal development workflows and platform capabilities.</p></li></ul><p><strong>Roles &amp; Responsibilities</strong></p><ul><li><p><strong>End-to-End Lifecycle Ownership:</strong> Own the entire lifecycle of feature and infrastructure delivery, from gathering functional and non-functional requirements to design, implementation, and production support.</p></li><li><p><strong>System &amp; Service Architecture:</strong> Design, develop, and architect reliable, modular APIs and distributed services to support highly scalable, multi-tenant cloud applications.</p></li><li><p><strong>Code Optimization &amp; Scaling:</strong> Lead major engineering initiatives focused on code optimization, refactoring, performance tuning, and scaling existing backend systems.</p></li><li><p><strong>Production Governance:</strong> Ensure maximum system resilience, establishing robust monitoring, telemetry, rate-limiting, and multi-region deployment configurations.</p></li><li><p><strong>Cross-Functional Partnership:</strong> Collaborate with Site Reliability Engineers (SREs), Product Managers (PMs), and fellow Tech Leads to deliver cohesive, platform-wide capabilities.</p></li><li><p><strong>Engineering Standards Advocacy:</strong> Drive organization-wide adoption of best practices for Object-Oriented Programming (OOP), design patterns, and SOLID principles.</p></li></ul>"
+      },
+      "qualifications": {
+        "title": "Qualifications",
+        "text": "<p><strong>Skills</strong></p><ul><li><p><strong>Core Computer Science Foundations:</strong> Expert-level knowledge of Data Structures &amp; Algorithms (DSA), with a strong command of time/space complexity trade-offs.</p></li><li><p><strong>High &amp; Low-Level Design (HLD/LLD):</strong> Proven capability to design scalable, fault-tolerant end-to-end systems, database schemas, and data models.</p></li><li><p><strong>Distributed Infrastructure Stack:</strong> Solid exposure to RDBMS, NoSQL, caching strategies, queuing systems, distributed queues, and microservices architectures.</p></li><li><p><strong>Cloud &amp; DevOps Practice:</strong> Hands-on experience working with CI/CD automation, DevOps tooling, and cloud infrastructure platforms such as AWS or GCP.</p></li><li><p><strong>Technical Communication &amp; Analysis:</strong> Exceptional logical reasoning and problem-solving skills, with the ability to clearly articulate complex technical thought processes.</p></li></ul><p><strong>Qualifications</strong></p><ul><li><p><strong>Professional Timeline:</strong> 6 to 9 years of dedicated experience building high-performance backend systems and infrastructure.</p></li><li><p><strong>Iterative Engineering Track Record:</strong> Verifiable experience building complex software systems from the ground up and guiding them through successive scale iterations.</p></li><li><p><strong>Leadership Capabilities:</strong> Demonstrated experience performing effective code reviews, directing technical scopes, and mentoring junior systems engineers.</p></li><li><p><strong>Adaptability:</strong> A proven ability to thrive in ambiguous, fast-paced environments without sacrificing engineering rigor or technical depth.</p></li><li><p><strong>Education Baseline:</strong> Degree in Computer Science, Engineering, or a closely related technical field.</p></li></ul>"
+      },
+      "additionalInformation": {
+        "title": "Additional Information",
+        "text": "<div sr-tagline=\"\"></div><p>At Freshworks, we have fostered an environment that enables everyone to find their true potential, purpose, and passion, welcoming colleagues of all backgrounds, genders, sexual orientations, religions, and ethnicities. We are committed to providing equal opportunity and believe that diversity in the workplace creates a more vibrant, richer environment that boosts the goals of our employees, communities, and business. <strong>Fresh vision. Real impact. Come build it with us.</strong></p>"
+      }
+    }
+  },
+  "compensation": {
+    "min": 0,
+    "max": 0,
+    "currency": "INR",
+    "period": "MONTHLY"
+  },
+  "active": true,
+  "visibility": "PUBLIC",
+  "industry": {
+    "id": "it_and_services",
+    "label": "Information Technology And Services"
+  },
+  "function": {
+    "id": "other",
+    "label": "Other"
+  },
+  "experienceLevel": {
+    "id": "mid_senior_level",
+    "label": "Mid-Senior Level"
+  },
+  "typeOfEmployment": {
+    "id": "permanent",
+    "label": "Full-time"
+  },
+  "language": {
+    "code": "en",
+    "label": "English",
+    "labelNative": "English (US)"
+  }
+}

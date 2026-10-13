@@ -29,6 +29,7 @@ from app.schemas.prospects import (
     TargetIn,
     TargetOut,
 )
+from app.services.connections import warm_path_out, warm_paths
 from app.services.contacts.service import OutreachConflictError, ProviderFactory, start_open_outreach
 from app.services.contacts.views import outreach_detail, outreach_out
 from app.services.jobs.companies import find_or_create_company
@@ -256,6 +257,7 @@ async def _match_out(
         status=match.status,
         created_at=match.created_at,
         outreach=await outreach_out(session, latest) if latest else None,
+        warm_path=warm_path_out((await warm_paths(session, match.user_id, [company])).get(company.id)),
     )
 
 

@@ -8,7 +8,7 @@ from typing import Annotated
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,10 +26,12 @@ from app.models.enums import (
     OutreachStatus,
 )
 from app.schemas.outreach import (
+    AnalyticsBucket,
     BuildQueued,
     DraftEditIn,
     ManualContactIn,
     ModeStats,
+    OutreachAnalytics,
     OutreachDetail,
     OutreachList,
     RegenerateIn,
@@ -37,6 +39,8 @@ from app.schemas.outreach import (
     TimelineEntry,
     TrackingIn,
 )
+from app.schemas.resume import MasterResume
+from app.services.analytics import Bucket, outreach_analytics
 from app.services.contacts.service import ManualContactError, ProviderFactory, set_contact_manually
 from app.services.contacts.views import outreach_detail, outreach_list_item, outreach_timeline
 from app.services.email.drafter import (
@@ -58,6 +62,7 @@ from app.services.registry import (
     get_llm_client,
     get_website_fetcher,
 )
+from app.services.resume.docx_export import docx_response
 from app.workers.queue import enqueue
 
 router = APIRouter(prefix="/outreach", tags=["outreach"])
@@ -136,6 +141,34 @@ async def list_outreach(
     return OutreachList(items=[await outreach_list_item(session, o) for o in rows], total=total)
 
 
+@router.get("/analytics", response_model=OutreachAnalytics)
+async def analytics(
+    user: CurrentUser, session: Session, days: Annotated[int | None, Query(ge=7, le=3650)] = 90
+) -> OutreachAnalytics:
+    """Reply rates by contact role, company stage, draft style and mode (PLAN.md Phase 10)."""
+    result = await outreach_analytics(session, user.id, datetime.now(UTC), days)
+    prefs = await load_preferences(session, user.id)
+
+    def buckets(items: list[Bucket]) -> list[AnalyticsBucket]:
+        return [AnalyticsBucket(**b.__dict__, reply_rate=b.reply_rate) for b in items]
+
+    return OutreachAnalytics(
+        since=result.since,
+        sent=result.sent,
+        replied=result.replied,
+        reply_rate=result.reply_rate,
+        referred=result.referred,
+        interview=result.interview,
+        by_role=buckets(result.by_role),
+        by_stage=buckets(result.by_stage),
+        by_variant=buckets(result.by_variant),
+        by_mode=buckets(result.by_mode),
+        leader=result.leader,
+        verdict=result.verdict,
+        draft_style=prefs.draft_style,
+    )
+
+
 @router.get("/stats", response_model=ReviewStats)
 async def review_stats(user: CurrentUser, session: Session) -> ReviewStats:
     """The stat cards on the review queue."""
@@ -161,6 +194,7 @@ async def review_stats(user: CurrentUser, session: Session) -> ReviewStats:
                 max_job_age_days=prefs.max_job_age_days,
                 employment_types=list(prefs.employment_types),
                 company_stages=list(prefs.company_stages),
+                job_sources=list(prefs.job_sources),
                 now=now,
             ),
         )
@@ -414,6 +448,17 @@ async def resume_pdf(outreach_id: uuid.UUID, user: CurrentUser, session: Session
         content_disposition_type="inline",
         headers={"Cache-Control": "no-store"},
     )
+
+
+@router.get("/{outreach_id}/resume.docx", response_class=Response)
+async def resume_docx(outreach_id: uuid.UUID, user: CurrentUser, session: Session) -> Response:
+    """The tailored resume as Word (PLAN.md Phase 10): same content as the attached PDF, for a
+    referrer whose ATS prefers DOCX. Download only; emails still attach the PDF."""
+    outreach = await _owned(session, user.id, outreach_id)
+    record = outreach.tailored_resume or {}
+    if "resume" not in record:
+        raise api_error(status.HTTP_404_NOT_FOUND, "no_resume_pdf", "This draft has no tailored resume yet.")
+    return await docx_response(MasterResume.model_validate(record["resume"]), record.get("section_order"))
 
 
 @router.post("/{outreach_id}/contact", response_model=OutreachDetail, dependencies=[WithinQuota])

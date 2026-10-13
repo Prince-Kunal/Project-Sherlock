@@ -11,8 +11,12 @@ export const SOURCE_LABELS: Record<string, string> = {
   greenhouse: "Greenhouse",
   lever: "Lever",
   ashby: "Ashby",
+  smartrecruiters: "SmartRecruiters",
+  workable: "Workable",
+  recruitee: "Recruitee",
   adzuna: "Adzuna",
   hn: "HN",
+  remotive: "via Remotive",
   manual: "Added by URL",
 };
 

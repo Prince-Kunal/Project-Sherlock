@@ -7,17 +7,18 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.models import Company, User, UserPreferences
-from app.models.enums import AtsType
+from app.models import Company, Job, User, UserPreferences
+from app.models.enums import AtsType, JobFeed
 from app.services.jobs.companies import find_or_create_company, load_company_seed
 from app.services.jobs.ingest import mark_unseen, upsert_jobs
 from app.services.sources.adzuna import AdzunaSource
 from app.services.sources.base import CompanyRef, JobIn, JobQuery, JobSource, MalformedJobError, RawJob
 from app.services.sources.hn import DEFAULT_KEYWORDS, HNSource
 from app.services.sources.http import SourceHTTPError
+from app.services.sources.remotive import RemotiveSource
 
 log = logging.getLogger(__name__)
 
@@ -44,6 +45,7 @@ class PollSources:
     boards: dict[AtsType, JobSource]
     adzuna: AdzunaSource | None = None
     hn: HNSource | None = None
+    remotive: RemotiveSource | None = None
 
 
 def _normalize_all(source: JobSource, raws: list[RawJob], summary: PollSummary) -> list[JobIn]:
@@ -64,12 +66,21 @@ async def _poll_board(
         company = await session.get(Company, company_id)
         if company is None or not company.ats_token:
             return
+        known = await session.scalars(
+            select(Job.external_id).where(
+                Job.company_id == company.id,
+                Job.source == source.source,
+                Job.external_id.is_not(None),
+                Job.description_text != "",
+            )
+        )
         ref = CompanyRef(
             id=company.id,
             name=company.name,
             domain=company.domain,
             ats_type=company.ats_type,
             ats_token=company.ats_token,
+            known_ids=frozenset(i for i in known.all() if i),
         )
         summary.processed += 1
         started = datetime.now(UTC)
@@ -113,12 +124,28 @@ async def _ingest_aggregated(
         await session.commit()
 
 
+async def wanted_feeds(session: AsyncSession) -> set[str]:
+    """Feeds at least one active, non-paused user has switched on (Phase 10). Aggregators nobody
+    wants aren't requested at all."""
+    rows = await session.scalars(
+        select(func.unnest(UserPreferences.job_sources))
+        .join(User, User.id == UserPreferences.user_id)
+        .where(User.is_active, UserPreferences.paused.is_(False))
+        .distinct()
+    )
+    return set(rows.all())
+
+
 async def adzuna_queries(session: AsyncSession) -> list[JobQuery]:
-    """One query per distinct target role across active, non-paused users."""
+    """One query per distinct target role across active, non-paused users who want Adzuna jobs."""
     rows = await session.execute(
         select(UserPreferences.target_roles)
         .join(User, User.id == UserPreferences.user_id)
-        .where(User.is_active, UserPreferences.paused.is_(False))
+        .where(
+            User.is_active,
+            UserPreferences.paused.is_(False),
+            literal(JobFeed.ADZUNA.value) == func.any(UserPreferences.job_sources),
+        )
     )
     roles = sorted({r.strip().lower() for (target_roles,) in rows for r in target_roles if r.strip()})
     return [JobQuery(what=role) for role in roles[:MAX_ADZUNA_QUERIES]]
@@ -150,6 +177,7 @@ async def run_poll(
             )
         ).all()
         queries = await adzuna_queries(session) if sources.adzuna and sources.adzuna.configured else []
+        feeds = await wanted_feeds(session)
 
     semaphore = asyncio.Semaphore(concurrency)
 
@@ -180,15 +208,24 @@ async def run_poll(
     elif sources.adzuna is not None:
         log.info("poll: Adzuna skipped (ADZUNA_APP_ID / ADZUNA_APP_KEY not set)")
 
-    if sources.hn is not None:
+    aggregators: list[tuple[str, HNSource | RemotiveSource | None]] = [
+        (JobFeed.HN, sources.hn),
+        (JobFeed.REMOTIVE, sources.remotive),
+    ]
+    for feed, aggregator in aggregators:
+        if aggregator is None:
+            continue
+        if feed not in feeds:
+            log.info("poll: %s skipped (no user has it switched on)", feed)
+            continue
         summary.processed += 1
         try:
-            raws = await sources.hn.fetch(None)
-            await _ingest_aggregated(sessions, sources.hn, raws, summary)
+            raws = await aggregator.fetch(None)
+            await _ingest_aggregated(sessions, aggregator, raws, summary)
             summary.succeeded += 1
         except SourceHTTPError as exc:
             summary.failed += 1
-            summary.errors.append(f"hn: {exc}")
+            summary.errors.append(f"{feed}: {exc}")
 
     log.info(
         "poll_sources: processed=%d succeeded=%d failed=%d created=%d updated=%d deactivated=%d skipped=%d",
